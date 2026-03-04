@@ -18,10 +18,15 @@ export function doctorTool(): string {
     `Default shell: ${DEFAULT_CONFIG.sandbox.shellDefault}`,
     `Resolved shell runtime: ${shellRuntime}`,
     `Policy mode: ${DEFAULT_CONFIG.security.policyMode}`,
+    `Private-network fetches: ${DEFAULT_CONFIG.security.allowPrivateNetworkFetch ? 'allowed' : 'blocked'}`,
     `Stats footer: ${DEFAULT_CONFIG.stats.footerEnabled ? 'enabled' : 'disabled'}`,
+    `Stats max events: ${DEFAULT_CONFIG.stats.maxEvents}`,
     `Compression threshold: ${DEFAULT_CONFIG.compression.thresholdBytes} bytes`,
     `Max output bytes: ${DEFAULT_CONFIG.compression.maxOutputBytes} bytes`,
     `Execution timeout: ${DEFAULT_CONFIG.sandbox.timeoutMs} ms`,
+    `Max execute_file size: ${DEFAULT_CONFIG.sandbox.maxFileBytes} bytes`,
+    `Auth passthrough: ${DEFAULT_CONFIG.sandbox.allowAuthPassthrough ? 'enabled' : 'disabled'}`,
+    `Max fetch size: ${DEFAULT_CONFIG.knowledgeBase.maxFetchBytes} bytes`,
     `Knowledge base path: ${DEFAULT_CONFIG.knowledgeBase.dbPath}`,
     '',
     `Available runtimes (${runtimes.length}):`,
@@ -33,4 +38,3 @@ export function doctorTool(): string {
 
   return lines.join('\n');
 }
-

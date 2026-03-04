@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'child_process';
-import { mkdtemp, rm, writeFile } from 'fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { buildSandboxEnv } from './auth-passthrough.js';
@@ -15,6 +15,8 @@ export interface ExecuteOptions {
   env?: Record<string, string>;
   projectRoot?: string;
   shellRuntime?: ShellRuntime;
+  allowAuthPassthrough?: boolean;
+  maxFileBytes?: number;
 }
 
 export interface ExecuteResult {
@@ -103,7 +105,10 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       ? options.projectRoot ?? process.cwd()
       : tmpDir;
 
-    const env = buildSandboxEnv(options.env);
+    const env = buildSandboxEnv(
+      options.env,
+      options.allowAuthPassthrough ?? DEFAULT_CONFIG.sandbox.allowAuthPassthrough
+    );
 
     return await new Promise<ExecuteResult>(resolve => {
       const child = spawn(cmd, args, {
@@ -204,7 +209,24 @@ export async function executeFile(
   userCode: string,
   options: Omit<ExecuteOptions, 'code' | 'language'>
 ): Promise<ExecuteResult> {
-  const { readFile } = await import('fs/promises');
+  const maxFileBytes = options.maxFileBytes ?? DEFAULT_CONFIG.sandbox.maxFileBytes;
+  let fileStats;
+  try {
+    fileStats = await stat(filePath);
+  } catch (err) {
+    throw new Error(`Cannot stat file "${filePath}": ${String(err)}`);
+  }
+
+  if (!fileStats.isFile()) {
+    throw new Error(`Path "${filePath}" is not a regular file`);
+  }
+
+  if (fileStats.size > maxFileBytes) {
+    throw new Error(
+      `File "${filePath}" is too large for execute_file (${fileStats.size} bytes > ${maxFileBytes} byte limit)`
+    );
+  }
+
   let fileContent: string;
   try {
     fileContent = await readFile(filePath, 'utf8');
@@ -223,4 +245,3 @@ export async function executeFile(
     },
   });
 }
-

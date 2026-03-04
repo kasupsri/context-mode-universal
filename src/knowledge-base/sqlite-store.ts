@@ -106,19 +106,34 @@ export class SqliteStore {
   ): Promise<number> {
     await this.ensureInitialized();
 
-    let count = 0;
+    if (chunks.length === 0) {
+      return 0;
+    }
+
     const now = Date.now();
-    for (const chunk of chunks) {
-      const stmt = this.db.prepare(
-        'INSERT INTO chunks (kb_name, source, heading, content, timestamp) VALUES (?, ?, ?, ?, ?)'
-      );
-      stmt.run([kbName, source, chunk.heading, chunk.content, now]);
+    const stmt = this.db.prepare(
+      'INSERT INTO chunks (kb_name, source, heading, content, timestamp) VALUES (?, ?, ?, ?, ?)'
+    );
+
+    try {
+      this.db.run('BEGIN TRANSACTION');
+      for (const chunk of chunks) {
+        stmt.run([kbName, source, chunk.heading, chunk.content, now]);
+      }
+      this.db.run('COMMIT');
+    } catch (err) {
+      try {
+        this.db.run('ROLLBACK');
+      } catch {
+        // Best effort.
+      }
+      throw err;
+    } finally {
       stmt.free();
-      count++;
     }
 
     this.persist();
-    return count;
+    return chunks.length;
   }
 
   async search(query: string, kbName = 'default', topK = 5): Promise<SearchResult[]> {

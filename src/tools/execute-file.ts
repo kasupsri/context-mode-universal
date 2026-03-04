@@ -32,19 +32,28 @@ export async function executeFileTool(input: ExecuteFileToolInput): Promise<stri
     }
   }
 
+  const timeoutMs =
+    typeof input.timeout === 'number' && Number.isFinite(input.timeout) && input.timeout > 0
+      ? Math.floor(input.timeout)
+      : DEFAULT_CONFIG.sandbox.timeoutMs;
+
   const result = await executeFile(input.file_path, input.code, {
-    timeoutMs: input.timeout ?? DEFAULT_CONFIG.sandbox.timeoutMs,
+    timeoutMs,
+    maxFileBytes: DEFAULT_CONFIG.sandbox.maxFileBytes,
   });
 
   let rawOutput = result.stdout;
 
-  if (result.exitCode !== 0) {
-    rawOutput += result.stderr ? `\nSTDERR:\n${result.stderr}` : '';
+  if (result.stderr) {
+    rawOutput += `${rawOutput ? '\n' : ''}STDERR:\n${result.stderr}`;
+  }
+
+  if (result.exitCode !== 0 && !result.timedOut) {
     rawOutput += `\n[Exit code: ${result.exitCode}]`;
   }
 
   if (result.timedOut) {
-    rawOutput = `[TIMEOUT]\n` + rawOutput;
+    rawOutput = `[TIMEOUT after ${timeoutMs}ms]\n${rawOutput}`;
   }
 
   const compressed = compress(rawOutput, {
@@ -59,4 +68,3 @@ export async function executeFileTool(input: ExecuteFileToolInput): Promise<stri
 
   return compressed.output;
 }
-

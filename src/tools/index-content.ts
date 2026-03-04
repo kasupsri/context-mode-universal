@@ -22,11 +22,15 @@ export interface IndexContentToolInput {
 export async function indexContentTool(input: IndexContentToolInput): Promise<string> {
   const store = getStore();
   const indexer = new Indexer(store);
+  const chunkSize =
+    typeof input.chunk_size === 'number' && Number.isFinite(input.chunk_size) && input.chunk_size > 0
+      ? Math.floor(input.chunk_size)
+      : DEFAULT_CONFIG.knowledgeBase.maxChunkSize;
 
   const result = await indexer.indexText(input.content, {
     source: input.source ?? 'inline',
     kbName: input.kb_name ?? 'default',
-    chunkSize: input.chunk_size ?? DEFAULT_CONFIG.knowledgeBase.maxChunkSize,
+    chunkSize,
   });
 
   const stats = await store.getStats(result.kbName);

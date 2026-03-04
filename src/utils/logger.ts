@@ -7,7 +7,29 @@ const LOG_LEVEL_ORDER: Record<LogLevel, number> = {
   error: 3,
 };
 
-const currentLevel: LogLevel = (process.env['LOG_LEVEL'] as LogLevel) ?? 'info';
+const LOG_LEVELS: ReadonlySet<LogLevel> = new Set(['debug', 'info', 'warn', 'error']);
+let currentLevel: LogLevel = 'info';
+
+function safeStringify(data: unknown): string {
+  try {
+    return JSON.stringify(data);
+  } catch {
+    return '[unserializable metadata]';
+  }
+}
+
+export function setLogLevel(level: LogLevel): void {
+  currentLevel = level;
+}
+
+export function getLogLevel(): LogLevel {
+  return currentLevel;
+}
+
+const envLevel = process.env['LOG_LEVEL'];
+if (envLevel && LOG_LEVELS.has(envLevel as LogLevel)) {
+  currentLevel = envLevel as LogLevel;
+}
 
 function shouldLog(level: LogLevel): boolean {
   return LOG_LEVEL_ORDER[level] >= LOG_LEVEL_ORDER[currentLevel];
@@ -17,12 +39,18 @@ function formatMessage(level: LogLevel, message: string, data?: unknown): string
   const timestamp = new Date().toISOString();
   const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
   if (data !== undefined) {
-    return `${prefix} ${message} ${JSON.stringify(data)}`;
+    return `${prefix} ${message} ${safeStringify(data)}`;
   }
   return `${prefix} ${message}`;
 }
 
 export const logger = {
+  setLevel(level: LogLevel): void {
+    setLogLevel(level);
+  },
+  getLevel(): LogLevel {
+    return getLogLevel();
+  },
   debug(message: string, data?: unknown): void {
     if (shouldLog('debug')) {
       process.stderr.write(formatMessage('debug', message, data) + '\n');

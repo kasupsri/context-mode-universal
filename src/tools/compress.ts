@@ -10,9 +10,12 @@ export interface CompressToolInput {
 }
 
 export function compressTool(input: CompressToolInput): string {
-  const maxChars = input.max_output_tokens
-    ? input.max_output_tokens * 4
-    : DEFAULT_CONFIG.compression.maxOutputBytes;
+  const maxChars =
+    typeof input.max_output_tokens === 'number' &&
+    Number.isFinite(input.max_output_tokens) &&
+    input.max_output_tokens > 0
+      ? Math.floor(input.max_output_tokens * 4)
+      : DEFAULT_CONFIG.compression.maxOutputBytes;
 
   const result = compress(input.content, {
     intent: input.intent,

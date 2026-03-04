@@ -172,6 +172,89 @@ const TOOLS: Tool[] = [
   },
 ];
 
+interface SchemaProperty {
+  type?: string;
+  enum?: string[];
+}
+
+interface ToolSchema {
+  properties?: Record<string, SchemaProperty>;
+  required?: string[];
+}
+
+const TOOL_BY_NAME = new Map(TOOLS.map(tool => [tool.name, tool]));
+
+function validateToolArguments(tool: Tool, args: unknown): string | null {
+  const schema = tool.inputSchema as ToolSchema;
+  const required = schema.required ?? [];
+  const properties = schema.properties ?? {};
+
+  if (args !== undefined && (typeof args !== 'object' || args === null || Array.isArray(args))) {
+    return `Invalid arguments for "${tool.name}": expected an object`;
+  }
+
+  const parsedArgs = (args ?? {}) as Record<string, unknown>;
+
+  for (const key of Object.keys(parsedArgs)) {
+    if (!Object.prototype.hasOwnProperty.call(properties, key)) {
+      return `Unknown argument "${key}" for tool "${tool.name}"`;
+    }
+  }
+
+  for (const key of required) {
+    if (!Object.prototype.hasOwnProperty.call(parsedArgs, key)) {
+      return `Missing required argument "${key}" for tool "${tool.name}"`;
+    }
+    const value = parsedArgs[key];
+    if (value === undefined || value === null) {
+      return `Argument "${key}" cannot be null or undefined for tool "${tool.name}"`;
+    }
+  }
+
+  for (const [key, property] of Object.entries(properties)) {
+    if (!Object.prototype.hasOwnProperty.call(parsedArgs, key)) {
+      continue;
+    }
+
+    const value = parsedArgs[key];
+    if (value === undefined || value === null) {
+      continue;
+    }
+
+    if (property.type === 'string' && typeof value !== 'string') {
+      return `Invalid argument type for "${key}" in tool "${tool.name}": expected string`;
+    }
+
+    if (property.type === 'number' && (typeof value !== 'number' || !Number.isFinite(value))) {
+      return `Invalid argument type for "${key}" in tool "${tool.name}": expected number`;
+    }
+
+    if (
+      property.type === 'object' &&
+      (typeof value !== 'object' || value === null || Array.isArray(value))
+    ) {
+      return `Invalid argument type for "${key}" in tool "${tool.name}": expected object`;
+    }
+
+    if (
+      property.type === 'array' &&
+      !Array.isArray(value)
+    ) {
+      return `Invalid argument type for "${key}" in tool "${tool.name}": expected array`;
+    }
+
+    if (property.type === 'number' && typeof value === 'number' && value <= 0) {
+      return `Invalid argument value for "${key}" in tool "${tool.name}": expected positive number`;
+    }
+
+    if (property.enum && typeof value === 'string' && !property.enum.includes(value)) {
+      return `Invalid value for "${key}" in tool "${tool.name}": expected one of ${property.enum.join(', ')}`;
+    }
+  }
+
+  return null;
+}
+
 export function createServer(): { server: Server; transport: StdioServerTransport } {
   const server = new Server(
     {
@@ -192,9 +275,18 @@ export function createServer(): { server: Server; transport: StdioServerTranspor
     logger.debug('Tool called', { name, args });
 
     try {
+      const tool = TOOL_BY_NAME.get(name);
+      if (!tool) {
+        throw new Error(`Unknown tool: ${name}`);
+      }
+
+      const validationError = validateToolArguments(tool, args);
+      if (validationError) {
+        throw new Error(validationError);
+      }
+
       let result: string;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
-      const typedArgs = (args ?? {}) as any;
+      const typedArgs: unknown = args ?? {};
 
       switch (name) {
         case 'execute':
@@ -231,7 +323,7 @@ export function createServer(): { server: Server; transport: StdioServerTranspor
           result = doctorTool();
           break;
         default:
-          throw new Error(`Unknown tool: ${name}`);
+          throw new Error(`Unhandled tool: ${name}`);
       }
 
       logger.debug('Tool completed', { name, outputLength: result.length });
@@ -252,4 +344,3 @@ export function createServer(): { server: Server; transport: StdioServerTranspor
   const transport = new StdioServerTransport();
   return { server, transport };
 }
-

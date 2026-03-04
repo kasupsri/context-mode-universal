@@ -2,6 +2,7 @@ import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { estimateTokens } from './token-estimator.js';
+import { DEFAULT_CONFIG } from '../config/defaults.js';
 
 export interface CompressionEvent {
   tool: string;
@@ -36,6 +37,7 @@ export interface SessionStats {
   bytesSaved: number;
   tokensSaved: number;
   savingsRatio: number;
+  droppedEvents: number;
   byTool: ToolStats[];
   events: CompressionEvent[];
 }
@@ -43,6 +45,7 @@ export interface SessionStats {
 class StatsTracker {
   private readonly startedAt: Date = new Date();
   private events: CompressionEvent[] = [];
+  private droppedEvents = 0;
 
   record(tool: string, inputText: string, outputText: string, strategy: string): CompressionEvent {
     const inputBytes = Buffer.byteLength(inputText, 'utf8');
@@ -60,6 +63,14 @@ class StatsTracker {
       timestamp: new Date(),
     };
     this.events.push(event);
+
+    const maxEvents = Math.max(1, DEFAULT_CONFIG.stats.maxEvents);
+    if (this.events.length > maxEvents) {
+      const overflow = this.events.length - maxEvents;
+      this.events.splice(0, overflow);
+      this.droppedEvents += overflow;
+    }
+
     return event;
   }
 
@@ -113,6 +124,7 @@ class StatsTracker {
       bytesSaved,
       tokensSaved,
       savingsRatio,
+      droppedEvents: this.droppedEvents,
       byTool,
       events: [...this.events],
     };
@@ -144,6 +156,9 @@ class StatsTracker {
       `Output: ${(stats.totalOutputBytes / 1024).toFixed(1)} KB (${stats.totalOutputTokens.toLocaleString()} tokens)`,
       `Saved: ${(stats.bytesSaved / 1024).toFixed(1)} KB (${stats.tokensSaved.toLocaleString()} tokens, ${stats.savingsRatio.toFixed(0)}%)`,
     ];
+    if (stats.droppedEvents > 0) {
+      lines.push(`Dropped old events: ${stats.droppedEvents} (max kept: ${DEFAULT_CONFIG.stats.maxEvents})`);
+    }
     if (stats.byTool.length > 0) {
       lines.push('', 'Top tools by bytes saved:');
       for (const t of stats.byTool.slice(0, 5)) {
@@ -166,8 +181,8 @@ class StatsTracker {
 
   reset(): void {
     this.events = [];
+    this.droppedEvents = 0;
   }
 }
 
 export const statsTracker = new StatsTracker();
-

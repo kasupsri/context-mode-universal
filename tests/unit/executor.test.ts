@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { executeCode } from '../../src/sandbox/executor.js';
+import { executeCode, executeFile } from '../../src/sandbox/executor.js';
 import { getRuntimeForLanguage, getAvailableRuntimes } from '../../src/sandbox/runtimes.js';
+import { randomBytes } from 'crypto';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { unlink, writeFile } from 'fs/promises';
 
 describe('executeCode', () => {
   it('executes JavaScript and captures stdout', async () => {
@@ -97,6 +101,21 @@ describe('executeCode', () => {
     });
     expect(result.durationMs).toBeGreaterThan(0);
     expect(result.durationMs).toBeLessThan(10_000);
+  });
+
+  it('rejects oversized files in executeFile', async () => {
+    const filePath = join(tmpdir(), `wcm-test-${randomBytes(6).toString('hex')}.txt`);
+    await writeFile(filePath, 'x'.repeat(2048), 'utf8');
+
+    try {
+      await expect(
+        executeFile(filePath, 'console.log("ok")', {
+          maxFileBytes: 1024,
+        })
+      ).rejects.toThrow(/too large/i);
+    } finally {
+      await unlink(filePath).catch(() => undefined);
+    }
   });
 });
 

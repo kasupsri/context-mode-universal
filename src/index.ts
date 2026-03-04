@@ -12,6 +12,19 @@ import { DEFAULT_CONFIG } from './config/defaults.js';
 import { runSetup } from './adapters/generic.js';
 import { doctorTool } from './tools/doctor.js';
 
+function applyRuntimeConfig(): void {
+  const merged = parseConfig(loadConfigFromEnv());
+  Object.assign(DEFAULT_CONFIG.compression, merged.compression);
+  Object.assign(DEFAULT_CONFIG.sandbox, merged.sandbox);
+  Object.assign(DEFAULT_CONFIG.security, merged.security);
+  Object.assign(DEFAULT_CONFIG.knowledgeBase, merged.knowledgeBase);
+  Object.assign(DEFAULT_CONFIG.logging, merged.logging);
+  Object.assign(DEFAULT_CONFIG.stats, merged.stats);
+  logger.setLevel(merged.logging.level);
+}
+
+applyRuntimeConfig();
+
 const args = process.argv.slice(2);
 
 // Handle setup command
@@ -22,13 +35,6 @@ if (args[0] === 'setup') {
     process.exit(1);
   });
 } else if (args[0] === 'doctor') {
-  const merged = parseConfig(loadConfigFromEnv());
-  Object.assign(DEFAULT_CONFIG.compression, merged.compression);
-  Object.assign(DEFAULT_CONFIG.sandbox, merged.sandbox);
-  Object.assign(DEFAULT_CONFIG.security, merged.security);
-  Object.assign(DEFAULT_CONFIG.knowledgeBase, merged.knowledgeBase);
-  Object.assign(DEFAULT_CONFIG.logging, merged.logging);
-  Object.assign(DEFAULT_CONFIG.stats, merged.stats);
   // eslint-disable-next-line no-console
   console.log(doctorTool());
 } else {
@@ -40,14 +46,6 @@ if (args[0] === 'setup') {
 }
 
 async function startServer() {
-  const merged = parseConfig(loadConfigFromEnv());
-  Object.assign(DEFAULT_CONFIG.compression, merged.compression);
-  Object.assign(DEFAULT_CONFIG.sandbox, merged.sandbox);
-  Object.assign(DEFAULT_CONFIG.security, merged.security);
-  Object.assign(DEFAULT_CONFIG.knowledgeBase, merged.knowledgeBase);
-  Object.assign(DEFAULT_CONFIG.logging, merged.logging);
-  Object.assign(DEFAULT_CONFIG.stats, merged.stats);
-
   logger.info('Starting windows-context-mode MCP server', { pid: process.pid });
 
   const { server, transport } = createServer();
@@ -57,11 +55,33 @@ async function startServer() {
   logger.info('MCP server connected via stdio');
 
   // Graceful shutdown
+  let shuttingDown = false;
   const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     logger.info(`Received ${signal}, shutting down`);
-    await server.close();
+    try {
+      await server.close();
+    } catch (err) {
+      logger.error('Failed to close server cleanly', {
+        signal,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
     process.exit(0);
   };
+
+  process.on('uncaughtException', err => {
+    logger.error('Uncaught exception', { error: err.message, stack: err.stack });
+    process.exit(1);
+  });
+
+  process.on('unhandledRejection', reason => {
+    logger.error('Unhandled rejection', {
+      reason: reason instanceof Error ? reason.message : String(reason),
+    });
+    process.exit(1);
+  });
 
   process.on('SIGINT', () => {
     void shutdown('SIGINT');

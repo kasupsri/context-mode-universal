@@ -1,168 +1,97 @@
-# Contributing to universal-context-mode
+# Contributing to windows-context-mode
 
-Thank you for your interest in contributing! This project welcomes contributions from the community.
+Thanks for contributing. This repository focuses on a Windows-first MCP server with strong safety defaults and context compression.
 
 ## Development Setup
 
-```bash
-# Clone the repo
-git clone https://github.com/phanindra208/universal-context-mode
-cd universal-context-mode
-
-# Install dependencies
+```powershell
+git clone https://github.com/kasupsri/windows-context-mode.git
+cd windows-context-mode
 npm install
-
-# Build
 npm run build
-
-# Run tests
 npm test
-
-# Watch mode for development
-npm run test:watch
 ```
 
-## Project Structure
+Optional local bootstrap:
 
+```powershell
+powershell -ExecutionPolicy Bypass -File .\setup.ps1
 ```
+
+## Project Layout
+
+```text
 src/
-├── compression/     # Core compression engine — the heart of the project
-├── knowledge-base/  # SQLite FTS5 storage and search
-├── sandbox/         # Subprocess execution with auth passthrough
-├── adapters/        # IDE-specific setup helpers
-├── tools/           # MCP tool implementations (7 tools)
-├── config/          # Configuration and defaults
-└── utils/           # Shared utilities
+  adapters/        IDE setup flows (currently wired: Cursor, Codex)
+  compression/     Content-aware compression and chunking
+  config/          Defaults and env parsing
+  knowledge-base/  SQLite indexing and BM25 search
+  sandbox/         Runtime resolution and command execution
+  security/        Policy rules and evaluation
+  tools/           MCP tool handlers
+  utils/           Logging, token estimation, stats tracking
 
 tests/
-├── unit/            # Unit tests for each module
-├── integration/     # End-to-end MCP protocol tests
-└── benchmarks/      # Compression ratio benchmarks
+  unit/            Module-level behavior
+  integration/     MCP and index/search integration
+  benchmarks/      Compression benchmark tests
 ```
 
-## TDD Workflow
+## Quality Gates
 
-We practice Test-Driven Development:
+Run these before opening a PR:
 
-1. Write a failing test for the feature/fix
-2. Implement the minimum code to make it pass
-3. Refactor if needed
-4. Ensure all existing tests still pass
-
-```bash
-# Run tests in watch mode
-npm run test:watch
-
-# Run a specific test file
-npx vitest run tests/unit/compression.test.ts
-
-# Run with coverage
-npm run test:coverage
-```
-
-## Adding a New Compression Strategy
-
-1. Add your strategy to `src/compression/strategies.ts`
-2. Add detection logic to `detectContentType()` if needed
-3. Wire it into the `compress()` function's switch statement
-4. Write unit tests in `tests/unit/compression.test.ts`
-5. Add a benchmark case in `tests/benchmarks/compression-ratio.test.ts`
-
-Example:
-```typescript
-// In strategies.ts
-function compressXml(text: string, maxChars: number, intent?: string): string {
-  if (intent) return filterByIntent(text, intent, maxChars);
-  // Your implementation
-}
-
-// Add to detectContentType():
-if (trimmed.startsWith('<') && trimmed.includes('</')) return 'xml';
-
-// Add to compress() switch:
-case 'xml': output = compressXml(text, maxOutputChars, options.intent); break;
-```
-
-## Adding a New IDE Adapter
-
-1. Create `src/adapters/your-ide.ts` implementing `BaseAdapter`
-2. Register it in `src/adapters/generic.ts`
-3. Create template files in `templates/your-ide/`
-4. Add a setup script in `scripts/setup-your-ide.sh`
-5. Document in README.md
-
-```typescript
-// src/adapters/your-ide.ts
-export class YourIdeAdapter implements BaseAdapter {
-  readonly ideName = 'Your IDE';
-  readonly detectionPaths = ['.youride'];
-
-  async detect(cwd: string): Promise<boolean> {
-    // Check for IDE-specific directory/files
-  }
-
-  async setup(config: AdapterConfig): Promise<SetupResult> {
-    // Write MCP config and rules files
-  }
-}
-```
-
-## Code Style
-
-- TypeScript strict mode
-- ESM modules (`import`/`export`, not `require`)
-- No `any` types without a comment explaining why
-- Functions should be pure where possible
-- No LLM API calls in compression logic — keep it algorithmic
-
-```bash
-# Lint
+```powershell
 npm run lint
-
-# Format
-npm run format
+npm run format:check
+npm run build
+npm test
 ```
 
-## Pull Request Process
+If your change affects compression behavior:
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feat/your-feature`
-3. Write tests first (TDD)
-4. Implement the feature
-5. Ensure all tests pass: `npm test`
-6. Run linting: `npm run lint`
-7. Submit a PR with a clear description
-
-## PR Template
-
-```markdown
-## What
-Brief description of the change.
-
-## Why
-Why is this change needed?
-
-## Testing
-- [ ] Unit tests added/updated
-- [ ] Integration tests pass
-- [ ] Benchmarks run (if compression-related)
-
-## IDE Compatibility
-- [ ] Tested with Claude Code
-- [ ] Tested with Cursor (if adapter change)
-- [ ] Tested with Windsurf (if adapter change)
+```powershell
+npm run benchmark
 ```
 
-## Reporting Bugs
+## Contribution Guidelines
 
-Use the [Bug Report template](.github/ISSUE_TEMPLATE/bug_report.md).
+- Keep compression algorithmic and deterministic (no external model/API dependency).
+- Preserve Windows-first behavior for shell runtime resolution and safety policy defaults.
+- Add or update tests for behavior changes.
+- Keep docs in sync with real command names, tool names, and setup flow.
+- Avoid broad unrelated refactors in the same PR.
 
-Include:
-- universal-context-mode version
-- Node.js version
-- IDE and version
-- Minimal reproduction
+## Adding or Updating an MCP Tool
 
-## Questions?
+1. Implement/update tool logic in `src/tools/`.
+2. Register schema and handler mapping in `src/server.ts`.
+3. Add unit/integration coverage in `tests/`.
+4. Update `README.md` tool docs if user-facing behavior changes.
 
-Open a [Discussion](https://github.com/phanindra208/universal-context-mode/discussions) for questions and ideas.
+## Adding a New IDE Setup Adapter
+
+1. Implement `BaseAdapter` in `src/adapters/`.
+2. Add detection/setup behavior and file output.
+3. Register it in `src/adapters/generic.ts`.
+4. Document setup commands and caveats in `README.md`.
+5. Add tests or verification notes in your PR.
+
+## Pull Requests
+
+1. Fork and create a branch (`feat/*`, `fix/*`, `docs/*`).
+2. Keep commits focused and descriptive.
+3. Include a clear PR description with:
+- what changed
+- why it changed
+- how it was tested
+- any Windows-specific validation performed
+
+## Reporting Issues
+
+Use:
+
+- [Bug report template](.github/ISSUE_TEMPLATE/bug_report.md)
+- [Feature request template](.github/ISSUE_TEMPLATE/feature_request.md)
+
+Please include Node.js version, Windows version, IDE/client details, and a minimal reproduction.

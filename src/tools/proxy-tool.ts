@@ -4,6 +4,7 @@ import { DEFAULT_CONFIG } from '../config/defaults.js';
 import { executeCode } from '../sandbox/executor.js';
 import { type Language, type ShellRuntime } from '../sandbox/runtimes.js';
 import { denyReason, evaluateCommand, evaluateFilePath, extractShellCommands } from '../security/policy.js';
+import { readFile, stat } from 'fs/promises';
 
 export interface ProxyToolInput {
   tool: string;
@@ -21,9 +22,12 @@ function maybeAppendFooter(rawOutput: string, compressedOutput: string, strategy
 }
 
 export async function proxyTool(input: ProxyToolInput): Promise<string> {
-  const maxChars = input.max_output_tokens
-    ? input.max_output_tokens * 4
-    : DEFAULT_CONFIG.compression.maxOutputBytes;
+  const maxChars =
+    typeof input.max_output_tokens === 'number' &&
+    Number.isFinite(input.max_output_tokens) &&
+    input.max_output_tokens > 0
+      ? Math.floor(input.max_output_tokens * 4)
+      : DEFAULT_CONFIG.compression.maxOutputBytes;
 
   let rawOutput: string;
 
@@ -36,6 +40,13 @@ export async function proxyTool(input: ProxyToolInput): Promise<string> {
         (input.args['command'] as string | undefined) ??
         '';
       const shellRuntime = input.args['shell_runtime'] as ShellRuntime | undefined;
+      const requestedTimeout = input.args['timeout'];
+      const timeout =
+        typeof requestedTimeout === 'number' &&
+        Number.isFinite(requestedTimeout) &&
+        requestedTimeout > 0
+          ? Math.floor(requestedTimeout)
+          : DEFAULT_CONFIG.sandbox.timeoutMs;
 
       if (lang === 'shell' || lang === 'powershell' || lang === 'cmd' || lang === 'bash' || lang === 'sh') {
         const decision = evaluateCommand(code);
@@ -52,10 +63,22 @@ export async function proxyTool(input: ProxyToolInput): Promise<string> {
         }
       }
 
-      const result = await executeCode({ language: lang, code, shellRuntime });
+      const result = await executeCode({
+        language: lang,
+        code,
+        shellRuntime,
+        timeoutMs: timeout,
+        allowAuthPassthrough: DEFAULT_CONFIG.sandbox.allowAuthPassthrough,
+      });
       rawOutput = result.stdout;
-      if (result.exitCode !== 0 && result.stderr) {
-        rawOutput += `\nSTDERR:\n${result.stderr}`;
+      if (result.stderr) {
+        rawOutput += `${rawOutput ? '\n' : ''}STDERR:\n${result.stderr}`;
+      }
+      if (result.timedOut) {
+        rawOutput = `[TIMEOUT after ${timeout}ms]\n${rawOutput}`;
+      }
+      if (result.exitCode !== 0 && !result.timedOut) {
+        rawOutput += `\n[Exit code: ${result.exitCode}]`;
       }
       break;
     }
@@ -69,7 +92,25 @@ export async function proxyTool(input: ProxyToolInput): Promise<string> {
       if (denied.denied) {
         return `Blocked by security policy: file path matches "${denied.matchedPattern}"`;
       }
-      const { readFile } = await import('fs/promises');
+
+      let fileStats;
+      try {
+        fileStats = await stat(filePath);
+      } catch (err) {
+        return `Error reading file "${filePath}": ${String(err)}`;
+      }
+
+      if (!fileStats.isFile()) {
+        return `Error reading file "${filePath}": path is not a regular file`;
+      }
+
+      if (fileStats.size > DEFAULT_CONFIG.sandbox.maxFileBytes) {
+        return [
+          `Error reading file "${filePath}": file is too large for proxy(read_file).`,
+          `Size: ${fileStats.size} bytes, limit: ${DEFAULT_CONFIG.sandbox.maxFileBytes} bytes.`,
+        ].join('\n');
+      }
+
       try {
         rawOutput = await readFile(filePath, 'utf8');
       } catch (err) {

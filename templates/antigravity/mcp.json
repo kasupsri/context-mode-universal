@@ -2,7 +2,7 @@
   "mcpServers": {
     "context-mode": {
       "command": "npx",
-      "args": ["-y", "universal-context-mode"],
+      "args": ["-y", "windows-context-mode"],
       "transport": "stdio"
     }
   }

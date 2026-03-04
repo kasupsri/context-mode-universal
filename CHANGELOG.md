@@ -7,19 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.0] - 2024-01-15
+### Changed
+- Rewrote project documentation for Windows-first setup and operations.
+- Expanded README with installation paths, environment variables, security modes, and diagnostics.
+- Updated contribution guide and issue templates to reference this repository and current workflows.
+
+### Removed
+- Deleted unused markdown template files under `templates/` that were not used by runtime setup flow.
+
+## [0.1.0] - 2026-03-04
 
 ### Added
-- Initial release
-- 7 MCP tools: `execute`, `execute_file`, `index`, `search`, `fetch_and_index`, `compress`, `proxy`
-- 10 language runtimes: JavaScript, TypeScript, Python, Shell, Ruby, Go, Rust, PHP, Perl, R
-- Content-type detection and specialized compression for: JSON, logs, code, markdown, CSV, generic
-- Intent-driven filtering using TF-IDF scoring (no LLM calls)
-- SQLite FTS5 knowledge base with Porter stemming and BM25 ranking
-- IDE adapters for: Claude Code, Cursor, Windsurf, GitHub Copilot (VS Code)
-- CLI setup command with auto-detection: `npx universal-context-mode setup`
-- Auth passthrough for: gh, aws, gcloud, kubectl, docker
-- Heading-aware markdown chunking (preserves code blocks)
-- Session stats tracking (bytes/tokens saved)
-- Comprehensive test suite: unit, integration, benchmarks
-- GitHub Actions CI/CD (test, release, weekly benchmark)
+- Initial `windows-context-mode` release.
+- MCP tools: `execute`, `execute_file`, `index`, `search`, `fetch_and_index`, `compress`, `proxy`, `stats_get`, `stats_reset`, `stats_export`, `doctor`.
+- Windows-first shell runtime strategy with fallback (`PowerShell -> cmd -> Git Bash`).
+- Configurable policy modes: `strict`, `balanced`, `permissive`.
+- Content-aware deterministic compression and intent-based filtering.
+- Local SQLite FTS5/BM25 knowledge base indexing and search.
+- Setup flows for Cursor and Codex plus PowerShell bootstrap script.
+- Session token/bytes savings tracking with export support.
+- Unit, integration, and benchmark test coverage.

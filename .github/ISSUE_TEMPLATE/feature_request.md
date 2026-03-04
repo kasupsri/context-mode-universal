@@ -10,13 +10,16 @@ assignees: ''
 <!-- A clear description of the feature you'd like -->
 
 ## Problem It Solves
-<!-- What problem does this solve? Which IDE or workflow benefits? -->
+<!-- What problem does this solve? Which Windows workflow or MCP client benefits? -->
 
 ## Proposed Solution
 <!-- How should this work? -->
 
 ## Alternatives Considered
 <!-- Any alternative approaches? -->
+
+## Compatibility Notes
+<!-- Any runtime/security impact? Example: shell runtime, policy mode, setup flow -->
 
 ## Additional Context
 <!-- Any other information, screenshots, examples -->

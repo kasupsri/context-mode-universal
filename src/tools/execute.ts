@@ -46,32 +46,39 @@ export async function executeTool(input: ExecuteToolInput): Promise<string> {
     return denied;
   }
 
+  const timeoutMs =
+    typeof input.timeout === 'number' && Number.isFinite(input.timeout) && input.timeout > 0
+      ? Math.floor(input.timeout)
+      : DEFAULT_CONFIG.sandbox.timeoutMs;
+
   const result: ExecuteResult = await executeCode({
     language: input.language,
     code: input.code,
-    timeoutMs: input.timeout ?? DEFAULT_CONFIG.sandbox.timeoutMs,
+    timeoutMs,
     memoryMB: DEFAULT_CONFIG.sandbox.memoryMB,
     shellRuntime: input.shell_runtime,
+    allowAuthPassthrough: DEFAULT_CONFIG.sandbox.allowAuthPassthrough,
   });
 
   let rawOutput = result.stdout;
-  if (result.stderr && result.exitCode !== 0) {
-    rawOutput += result.stderr ? `\nSTDERR:\n${result.stderr}` : '';
+  if (result.stderr) {
+    rawOutput += `${rawOutput ? '\n' : ''}STDERR:\n${result.stderr}`;
   }
 
   if (result.timedOut) {
-    rawOutput =
-      `[TIMEOUT after ${input.timeout ?? DEFAULT_CONFIG.sandbox.timeoutMs}ms]\n` + rawOutput;
+    rawOutput = `[TIMEOUT after ${timeoutMs}ms]\n${rawOutput}`;
   }
 
   if (result.exitCode !== 0 && !result.timedOut) {
     rawOutput += `\n[Exit code: ${result.exitCode}]`;
-    if (result.stderr) rawOutput += `\nSTDERR:\n${result.stderr}`;
   }
 
-  const maxChars = input.max_output_tokens
-    ? input.max_output_tokens * 4
-    : DEFAULT_CONFIG.compression.maxOutputBytes;
+  const maxChars =
+    typeof input.max_output_tokens === 'number' &&
+    Number.isFinite(input.max_output_tokens) &&
+    input.max_output_tokens > 0
+      ? Math.floor(input.max_output_tokens * 4)
+      : DEFAULT_CONFIG.compression.maxOutputBytes;
 
   const compressed = compress(rawOutput, {
     intent: input.intent,
@@ -85,4 +92,3 @@ export async function executeTool(input: ExecuteToolInput): Promise<string> {
 
   return compressed.output;
 }
-

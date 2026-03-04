@@ -142,7 +142,38 @@ describe('MCP Protocol Compliance', () => {
       arguments: { language: 'javascript' }, // missing 'code'
     });
 
-    // Should either error or handle gracefully
-    expect(result.content).toBeDefined();
+    expect(result.isError).toBe(true);
+    const text = (result.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
+    expect(text).toContain('Missing required argument "code"');
+  });
+
+  it('returns error for invalid enum values', async () => {
+    const result = await client.callTool({
+      name: 'execute',
+      arguments: {
+        language: 'shell',
+        code: 'echo hello',
+        shell_runtime: 'zsh',
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    const text = (result.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
+    expect(text).toContain('Invalid value for "shell_runtime"');
+  });
+
+  it('returns error for unknown arguments', async () => {
+    const result = await client.callTool({
+      name: 'execute',
+      arguments: {
+        language: 'javascript',
+        code: 'console.log("ok")',
+        unknown_option: true,
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    const text = (result.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
+    expect(text).toContain('Unknown argument "unknown_option"');
   });
 });

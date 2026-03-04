@@ -11,15 +11,19 @@ export interface ContextModeConfig {
     memoryMB: number;
     preferBun: boolean;
     shellDefault: 'powershell' | 'cmd' | 'git-bash';
+    allowAuthPassthrough: boolean;
+    maxFileBytes: number;
   };
   security: {
     policyMode: 'strict' | 'balanced' | 'permissive';
+    allowPrivateNetworkFetch: boolean;
   };
   knowledgeBase: {
     dbPath: string; // Will be set to OS temp by default
     maxChunkSize: number; // Max chars per chunk
     chunkOverlap: number; // Overlap between chunks
     searchTopK: number; // Default search results
+    maxFetchBytes: number;
   };
   logging: {
     level: 'debug' | 'info' | 'warn' | 'error';
@@ -27,6 +31,7 @@ export interface ContextModeConfig {
   stats: {
     footerEnabled: boolean;
     exportPath?: string;
+    maxEvents: number;
   };
 }
 
@@ -46,20 +51,25 @@ export const DEFAULT_CONFIG: ContextModeConfig = {
     memoryMB: 256,
     preferBun: true,
     shellDefault: 'powershell',
+    allowAuthPassthrough: false,
+    maxFileBytes: 1 * 1024 * 1024, // 1MB
   },
   security: {
     policyMode: 'strict',
+    allowPrivateNetworkFetch: false,
   },
   knowledgeBase: {
     dbPath: join(tmpdir(), 'windows-context-mode.db'),
     maxChunkSize: 1500,
     chunkOverlap: 100,
     searchTopK: 5,
+    maxFetchBytes: 5 * 1024 * 1024, // 5MB
   },
   logging: {
     level: 'info',
   },
   stats: {
     footerEnabled: true,
+    maxEvents: 1000,
   },
 };
