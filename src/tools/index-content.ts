@@ -23,7 +23,9 @@ export async function indexContentTool(input: IndexContentToolInput): Promise<st
   const store = getStore();
   const indexer = new Indexer(store);
   const chunkSize =
-    typeof input.chunk_size === 'number' && Number.isFinite(input.chunk_size) && input.chunk_size > 0
+    typeof input.chunk_size === 'number' &&
+    Number.isFinite(input.chunk_size) &&
+    input.chunk_size > 0
       ? Math.floor(input.chunk_size)
       : DEFAULT_CONFIG.knowledgeBase.maxChunkSize;
 

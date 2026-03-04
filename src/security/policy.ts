@@ -21,9 +21,7 @@ export function getActivePolicy(): SecurityPolicy {
 }
 
 function globToRegex(glob: string, caseInsensitive = process.platform === 'win32'): RegExp {
-  const escaped = glob
-    .replace(/[.+?^${}()|[\]\\/-]/g, '\\$&')
-    .replace(/\*/g, '.*');
+  const escaped = glob.replace(/[.+?^${}()|[\]\\/-]/g, '\\$&').replace(/\*/g, '.*');
   return new RegExp(`^${escaped}$`, caseInsensitive ? 'i' : '');
 }
 
@@ -62,7 +60,7 @@ export function splitChainedCommands(command: string): string[] {
 
   for (let i = 0; i < command.length; i += 1) {
     const ch = command[i] ?? '';
-    const prev = i > 0 ? command[i - 1] ?? '' : '';
+    const prev = i > 0 ? (command[i - 1] ?? '') : '';
 
     if (ch === "'" && !inDouble && !inBacktick && prev !== '\\') {
       inSingle = !inSingle;

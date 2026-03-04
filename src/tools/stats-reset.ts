@@ -4,4 +4,3 @@ export function statsResetTool(): string {
   statsTracker.reset();
   return 'Session compression statistics reset.';
 }
-

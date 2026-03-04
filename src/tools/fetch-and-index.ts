@@ -156,7 +156,9 @@ async function fetchAndConvertToMarkdown(url: string): Promise<string> {
   await assertPublicFetchTarget(finalUrl);
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ${response.statusText} fetching ${finalUrl.toString()}`);
+    throw new Error(
+      `HTTP ${response.status} ${response.statusText} fetching ${finalUrl.toString()}`
+    );
   }
 
   const contentType = response.headers.get('content-type') ?? '';
@@ -164,7 +166,10 @@ async function fetchAndConvertToMarkdown(url: string): Promise<string> {
     throw new Error(`Unsupported content type "${contentType}"`);
   }
 
-  const bodyText = await readResponseTextWithLimit(response, DEFAULT_CONFIG.knowledgeBase.maxFetchBytes);
+  const bodyText = await readResponseTextWithLimit(
+    response,
+    DEFAULT_CONFIG.knowledgeBase.maxFetchBytes
+  );
 
   if (
     contentType.includes('text/plain') ||

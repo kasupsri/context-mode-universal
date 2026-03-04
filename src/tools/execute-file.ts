@@ -2,7 +2,12 @@ import { executeFile } from '../sandbox/executor.js';
 import { compress } from '../compression/strategies.js';
 import { statsTracker } from '../utils/stats-tracker.js';
 import { DEFAULT_CONFIG } from '../config/defaults.js';
-import { denyReason, evaluateCommand, evaluateFilePath, extractShellCommands } from '../security/policy.js';
+import {
+  denyReason,
+  evaluateCommand,
+  evaluateFilePath,
+  extractShellCommands,
+} from '../security/policy.js';
 
 export interface ExecuteFileToolInput {
   file_path: string;

@@ -40,4 +40,3 @@ describe('policy extractShellCommands', () => {
     expect(cmds[0]).toContain('del /s /q');
   });
 });
-

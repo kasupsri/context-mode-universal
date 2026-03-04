@@ -236,10 +236,7 @@ function validateToolArguments(tool: Tool, args: unknown): string | null {
       return `Invalid argument type for "${key}" in tool "${tool.name}": expected object`;
     }
 
-    if (
-      property.type === 'array' &&
-      !Array.isArray(value)
-    ) {
+    if (property.type === 'array' && !Array.isArray(value)) {
       return `Invalid argument type for "${key}" in tool "${tool.name}": expected array`;
     }
 

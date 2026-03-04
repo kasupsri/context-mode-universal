@@ -157,7 +157,9 @@ class StatsTracker {
       `Saved: ${(stats.bytesSaved / 1024).toFixed(1)} KB (${stats.tokensSaved.toLocaleString()} tokens, ${stats.savingsRatio.toFixed(0)}%)`,
     ];
     if (stats.droppedEvents > 0) {
-      lines.push(`Dropped old events: ${stats.droppedEvents} (max kept: ${DEFAULT_CONFIG.stats.maxEvents})`);
+      lines.push(
+        `Dropped old events: ${stats.droppedEvents} (max kept: ${DEFAULT_CONFIG.stats.maxEvents})`
+      );
     }
     if (stats.byTool.length > 0) {
       lines.push('', 'Top tools by bytes saved:');
@@ -172,8 +174,7 @@ class StatsTracker {
 
   async exportToFile(path?: string): Promise<string> {
     const targetPath =
-      path ??
-      join(tmpdir(), `wcm-stats-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+      path ?? join(tmpdir(), `wcm-stats-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
     const stats = this.getSessionStats();
     await writeFile(targetPath, JSON.stringify(stats, null, 2), 'utf8');
     return targetPath;

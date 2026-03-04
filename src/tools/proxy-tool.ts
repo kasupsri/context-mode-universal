@@ -3,7 +3,12 @@ import { statsTracker } from '../utils/stats-tracker.js';
 import { DEFAULT_CONFIG } from '../config/defaults.js';
 import { executeCode } from '../sandbox/executor.js';
 import { type Language, type ShellRuntime } from '../sandbox/runtimes.js';
-import { denyReason, evaluateCommand, evaluateFilePath, extractShellCommands } from '../security/policy.js';
+import {
+  denyReason,
+  evaluateCommand,
+  evaluateFilePath,
+  extractShellCommands,
+} from '../security/policy.js';
 import { readFile, stat } from 'fs/promises';
 
 export interface ProxyToolInput {
@@ -48,7 +53,13 @@ export async function proxyTool(input: ProxyToolInput): Promise<string> {
           ? Math.floor(requestedTimeout)
           : DEFAULT_CONFIG.sandbox.timeoutMs;
 
-      if (lang === 'shell' || lang === 'powershell' || lang === 'cmd' || lang === 'bash' || lang === 'sh') {
+      if (
+        lang === 'shell' ||
+        lang === 'powershell' ||
+        lang === 'cmd' ||
+        lang === 'bash' ||
+        lang === 'sh'
+      ) {
         const decision = evaluateCommand(code);
         if (decision.decision === 'deny' || decision.decision === 'ask') {
           return denyReason(decision);

@@ -44,4 +44,3 @@ export class CodexAdapter implements BaseAdapter {
     };
   }
 }
-

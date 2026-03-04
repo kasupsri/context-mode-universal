@@ -3,7 +3,12 @@ import { mkdtemp, readFile, rm, stat, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { buildSandboxEnv } from './auth-passthrough.js';
-import { type Language, type ShellRuntime, getRuntimeForLanguage, isShellLanguage } from './runtimes.js';
+import {
+  type Language,
+  type ShellRuntime,
+  getRuntimeForLanguage,
+  isShellLanguage,
+} from './runtimes.js';
 import { DEFAULT_CONFIG } from '../config/defaults.js';
 import { logger } from '../utils/logger.js';
 
@@ -33,7 +38,10 @@ const HARD_OUTPUT_CAP_BYTES = 10 * 1024 * 1024; // 10MB
 function killProcessTree(pid: number): void {
   if (process.platform === 'win32') {
     try {
-      spawnSync('taskkill', ['/F', '/T', '/PID', String(pid)], { stdio: 'ignore', windowsHide: true });
+      spawnSync('taskkill', ['/F', '/T', '/PID', String(pid)], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
     } catch {
       // Best effort.
     }
@@ -101,9 +109,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
       args = [`--max-old-space-size=${memoryMB}`, ...args];
     }
 
-    const cwd = isShellLanguage(options.language)
-      ? options.projectRoot ?? process.cwd()
-      : tmpDir;
+    const cwd = isShellLanguage(options.language) ? (options.projectRoot ?? process.cwd()) : tmpDir;
 
     const env = buildSandboxEnv(
       options.env,
@@ -179,7 +185,7 @@ export async function executeCode(options: ExecuteOptions): Promise<ExecuteResul
         const result: ExecuteResult = {
           stdout,
           stderr,
-          exitCode: timedOut ? 1 : code ?? 1,
+          exitCode: timedOut ? 1 : (code ?? 1),
           timedOut,
           language: options.language,
           durationMs: Date.now() - startTime,

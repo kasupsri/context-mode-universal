@@ -35,7 +35,6 @@ if (args[0] === 'setup') {
     process.exit(1);
   });
 } else if (args[0] === 'doctor') {
-  // eslint-disable-next-line no-console
   console.log(doctorTool());
 } else {
   // Start MCP server

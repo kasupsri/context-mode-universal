@@ -31,9 +31,8 @@ export async function runSetup(ideHint?: string): Promise<void> {
       ) ?? null;
 
     if (!adapter) {
-      // eslint-disable-next-line no-console
       console.error(`Unknown IDE: "${ideHint}"`);
-      // eslint-disable-next-line no-console
+
       console.error(`Available: ${ADAPTERS.map(a => a.ideName).join(', ')}, auto`);
       process.exit(1);
     }
@@ -45,33 +44,26 @@ export async function runSetup(ideHint?: string): Promise<void> {
       return;
     }
 
-    // eslint-disable-next-line no-console
     console.log(`Detected IDE: ${adapter.ideName}`);
   }
 
-  // eslint-disable-next-line no-console
   console.log(`Setting up windows-context-mode for ${adapter.ideName}...`);
   const result: SetupResult = await adapter.setup(config);
 
   if (result.filesCreated.length > 0) {
-    // eslint-disable-next-line no-console
     console.log('\nFiles created:');
     for (const f of result.filesCreated) {
-      // eslint-disable-next-line no-console
       console.log(`  ✓ ${f}`);
     }
   }
 
-  // eslint-disable-next-line no-console
   console.log('\nNext steps:');
   for (const step of result.nextSteps) {
-    // eslint-disable-next-line no-console
     console.log(step ? `  ${step}` : '');
   }
 }
 
 function printManualSetup(): void {
-  // eslint-disable-next-line no-console
   console.log(`
 No supported IDE detected in current directory.
 Supported IDEs: ${ADAPTERS.map(a => a.ideName).join(', ')}
@@ -94,4 +86,3 @@ Generic MCP config:
   }
 `);
 }
-

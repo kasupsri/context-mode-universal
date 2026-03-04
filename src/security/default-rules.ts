@@ -80,4 +80,3 @@ export function policyByMode(mode: 'strict' | 'balanced' | 'permissive'): Policy
     fileDeny: SHARED_FILE_DENY,
   };
 }
-

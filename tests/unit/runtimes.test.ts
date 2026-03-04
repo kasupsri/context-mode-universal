@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { getRuntimeForLanguage, resolveShellRuntime, isShellLanguage } from '../../src/sandbox/runtimes.js';
+import {
+  getRuntimeForLanguage,
+  resolveShellRuntime,
+  isShellLanguage,
+} from '../../src/sandbox/runtimes.js';
 
 describe('runtimes', () => {
   it('resolves javascript runtime', () => {
@@ -21,4 +25,3 @@ describe('runtimes', () => {
     expect(rt?.runtimeId).toBeTruthy();
   });
 });
-

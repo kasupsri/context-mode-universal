@@ -9,4 +9,3 @@ export async function statsExportTool(input: StatsExportInput): Promise<string> 
   const path = await statsTracker.exportToFile(input.path ?? DEFAULT_CONFIG.stats.exportPath);
   return `Session stats exported to: ${path}`;
 }
-

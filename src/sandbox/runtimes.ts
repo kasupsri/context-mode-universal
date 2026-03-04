@@ -234,7 +234,15 @@ function buildShellRuntime(kind: ShellRuntime): Runtime | null {
       return {
         language: 'shell',
         command: ps,
-        args: f => ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', f],
+        args: f => [
+          '-NoLogo',
+          '-NoProfile',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-File',
+          f,
+        ],
         extension: 'ps1',
         available: true,
         runtimeId: 'powershell',
@@ -260,7 +268,15 @@ function buildShellRuntime(kind: ShellRuntime): Runtime | null {
     return {
       language: 'shell',
       command: ps,
-      args: f => ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', f],
+      args: f => [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        f,
+      ],
       extension: 'ps1',
       available: true,
       runtimeId: 'powershell',

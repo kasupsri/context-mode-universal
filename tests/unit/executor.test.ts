@@ -82,7 +82,9 @@ describe('executeCode', () => {
   it('throws for unavailable runtime', async () => {
     const rt = getRuntimeForLanguage('r');
     if (rt) {
-      console.log('Skipping unavailable runtime test: all baseline runtimes available in this environment');
+      console.log(
+        'Skipping unavailable runtime test: all baseline runtimes available in this environment'
+      );
       return;
     }
 
