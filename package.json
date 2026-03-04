@@ -1,15 +1,15 @@
 {
-  "name": "universal-context-mode",
-  "version": "0.1.1",
-  "description": "Stop losing context to large outputs — MCP server that compresses tool outputs. Works everywhere: Claude Code, Cursor, Windsurf, Copilot, and any MCP-compatible IDE.",
+  "name": "windows-context-mode",
+  "version": "0.1.0",
+  "description": "Windows-first MCP server that compresses tool outputs, enforces strict safety policies, and tracks token savings.",
   "keywords": [
     "mcp",
     "context-window",
     "compression",
-    "claude-code",
+    "windows",
+    "powershell",
     "cursor",
-    "windsurf",
-    "copilot",
+    "codex",
     "ai-tools",
     "model-context-protocol"
   ],
@@ -18,12 +18,13 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "universal-context-mode": "dist/index.js"
+    "windows-context-mode": "dist/index.js"
   },
   "files": [
     "dist/",
     "templates/",
-    "scripts/"
+    "scripts/",
+    "setup.ps1"
   ],
   "scripts": {
     "build": "tsc",
@@ -38,17 +39,20 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
     "benchmark": "tsx scripts/benchmark.ts",
     "setup": "node dist/index.js setup",
+    "doctor": "node dist/index.js doctor",
+    "setup:ps1": "powershell -ExecutionPolicy Bypass -File ./setup.ps1",
     "prepublishOnly": "npm run build && npm test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "sql.js": "^1.12.0",
     "commander": "^12.1.0",
+    "sql.js": "^1.12.0",
     "turndown": "^7.2.0"
   },
   "devDependencies": {
-    "@types/sql.js": "^1.4.9",
+    "@types/emscripten": "^1.41.5",
     "@types/node": "^20.0.0",
+    "@types/sql.js": "^1.4.9",
     "@types/turndown": "^5.0.5",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
@@ -64,10 +68,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/phanindra208/universal-context-mode"
+    "url": "https://github.com/kasupsri/windows-context-mode.git"
   },
   "bugs": {
-    "url": "https://github.com/phanindra208/universal-context-mode/issues"
+    "url": "https://github.com/kasupsri/windows-context-mode/issues"
   },
-  "homepage": "https://github.com/phanindra208/universal-context-mode#readme"
+  "homepage": "https://github.com/kasupsri/windows-context-mode#readme"
 }

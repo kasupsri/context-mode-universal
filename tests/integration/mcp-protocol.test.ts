@@ -20,7 +20,7 @@ describe('MCP Protocol Compliance', () => {
     await client.close();
   });
 
-  it('lists all 7 tools', async () => {
+  it('lists all Windows context mode tools', async () => {
     const { tools } = await client.listTools();
     const names = tools.map(t => t.name);
 
@@ -31,7 +31,11 @@ describe('MCP Protocol Compliance', () => {
     expect(names).toContain('fetch_and_index');
     expect(names).toContain('compress');
     expect(names).toContain('proxy');
-    expect(tools.length).toBe(7);
+    expect(names).toContain('stats_get');
+    expect(names).toContain('stats_reset');
+    expect(names).toContain('stats_export');
+    expect(names).toContain('doctor');
+    expect(tools.length).toBe(11);
   });
 
   it('each tool has required JSON schema', async () => {
@@ -79,6 +83,23 @@ describe('MCP Protocol Compliance', () => {
     expect(result.isError).toBeFalsy();
     const text = (result.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
     expect(text.length).toBeLessThan(largeContent.length);
+  });
+
+  it('stats tools return and reset session data', async () => {
+    await client.callTool({
+      name: 'compress',
+      arguments: {
+        content: JSON.stringify(Array.from({ length: 300 }, (_, i) => ({ i, value: `item-${i}` }))),
+      },
+    });
+
+    const stats = await client.callTool({ name: 'stats_get', arguments: {} });
+    const statsText = (stats.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
+    expect(statsText).toContain('Session Stats');
+
+    const reset = await client.callTool({ name: 'stats_reset', arguments: {} });
+    const resetText = (reset.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
+    expect(resetText).toContain('reset');
   });
 
   it('index and search round-trip works', async () => {

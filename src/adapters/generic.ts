@@ -1,18 +1,10 @@
 import { cwd } from 'process';
-import { ClaudeCodeAdapter } from './claude-code.js';
 import { CursorAdapter } from './cursor.js';
-import { WindsurfAdapter } from './windsurf.js';
-import { CopilotAdapter } from './copilot.js';
+import { CodexAdapter } from './codex.js';
 import { type BaseAdapter, type SetupResult } from './base-adapter.js';
 
-const ADAPTERS: BaseAdapter[] = [
-  new ClaudeCodeAdapter(),
-  new CursorAdapter(),
-  new WindsurfAdapter(),
-  new CopilotAdapter(),
-];
-
-const SERVER_PACKAGE = 'universal-context-mode';
+const ADAPTERS: BaseAdapter[] = [new CursorAdapter(), new CodexAdapter()];
+const SERVER_PACKAGE = 'windows-context-mode';
 
 async function detectIde(projectRoot: string): Promise<BaseAdapter | null> {
   for (const adapter of ADAPTERS) {
@@ -29,7 +21,7 @@ export async function runSetup(ideHint?: string): Promise<void> {
 
   let adapter: BaseAdapter | null = null;
 
-  if (ideHint) {
+  if (ideHint && ideHint !== 'auto') {
     const hint = ideHint.toLowerCase();
     adapter =
       ADAPTERS.find(
@@ -39,8 +31,10 @@ export async function runSetup(ideHint?: string): Promise<void> {
       ) ?? null;
 
     if (!adapter) {
+      // eslint-disable-next-line no-console
       console.error(`Unknown IDE: "${ideHint}"`);
-      console.error(`Available: ${ADAPTERS.map(a => a.ideName).join(', ')}`);
+      // eslint-disable-next-line no-console
+      console.error(`Available: ${ADAPTERS.map(a => a.ideName).join(', ')}, auto`);
       process.exit(1);
     }
   } else {
@@ -51,45 +45,53 @@ export async function runSetup(ideHint?: string): Promise<void> {
       return;
     }
 
+    // eslint-disable-next-line no-console
     console.log(`Detected IDE: ${adapter.ideName}`);
   }
 
-  console.log(`Setting up context-mode for ${adapter.ideName}...`);
+  // eslint-disable-next-line no-console
+  console.log(`Setting up windows-context-mode for ${adapter.ideName}...`);
   const result: SetupResult = await adapter.setup(config);
 
   if (result.filesCreated.length > 0) {
+    // eslint-disable-next-line no-console
     console.log('\nFiles created:');
     for (const f of result.filesCreated) {
+      // eslint-disable-next-line no-console
       console.log(`  ✓ ${f}`);
     }
   }
 
+  // eslint-disable-next-line no-console
   console.log('\nNext steps:');
   for (const step of result.nextSteps) {
+    // eslint-disable-next-line no-console
     console.log(step ? `  ${step}` : '');
   }
 }
 
 function printManualSetup(): void {
+  // eslint-disable-next-line no-console
   console.log(`
 No supported IDE detected in current directory.
 Supported IDEs: ${ADAPTERS.map(a => a.ideName).join(', ')}
 
 Manual setup options:
+  npx windows-context-mode setup cursor
+  npx windows-context-mode setup codex
 
-  npx universal-context-mode setup claude-code
-  npx universal-context-mode setup cursor
-  npx universal-context-mode setup windsurf
-  npx universal-context-mode setup copilot
+Codex CLI command:
+  codex mcp add context-mode -- npx -y windows-context-mode
 
-Or add to any MCP-compatible host with:
+Generic MCP config:
   {
     "mcpServers": {
       "context-mode": {
         "command": "npx",
-        "args": ["-y", "universal-context-mode"]
+        "args": ["-y", "windows-context-mode"]
       }
     }
   }
 `);
 }
+

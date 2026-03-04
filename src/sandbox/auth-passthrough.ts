@@ -8,13 +8,19 @@ import { join } from 'path';
  */
 export function buildSandboxEnv(additionalEnv?: Record<string, string>): NodeJS.ProcessEnv {
   const home = homedir();
+  const isWindows = process.platform === 'win32';
 
   const baseEnv: NodeJS.ProcessEnv = {
     // Core
     HOME: home,
-    PATH: process.env['PATH'] ?? '/usr/local/bin:/usr/bin:/bin',
+    PATH: process.env['PATH'] ?? (isWindows ? '' : '/usr/local/bin:/usr/bin:/bin'),
     LANG: process.env['LANG'] ?? 'en_US.UTF-8',
     TERM: 'dumb',
+    USERPROFILE: process.env['USERPROFILE'] ?? home,
+    PYTHONDONTWRITEBYTECODE: '1',
+    PYTHONUNBUFFERED: '1',
+    PYTHONUTF8: '1',
+    NO_COLOR: '1',
 
     // GitHub CLI
     GITHUB_TOKEN: process.env['GITHUB_TOKEN'],
@@ -54,6 +60,25 @@ export function buildSandboxEnv(additionalEnv?: Record<string, string>): NodeJS.
     // User additions
     ...additionalEnv,
   };
+
+  if (isWindows) {
+    const windowsVars = [
+      'SYSTEMROOT',
+      'SystemRoot',
+      'COMSPEC',
+      'PATHEXT',
+      'APPDATA',
+      'LOCALAPPDATA',
+      'TEMP',
+      'TMP',
+      'ProgramData',
+    ];
+    for (const key of windowsVars) {
+      if (process.env[key]) {
+        baseEnv[key] = process.env[key];
+      }
+    }
+  }
 
   // Remove undefined values
   const cleaned: NodeJS.ProcessEnv = {};

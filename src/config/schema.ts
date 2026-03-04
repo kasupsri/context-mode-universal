@@ -20,6 +20,10 @@ export function parseConfig(input: unknown): ContextModeConfig {
       ...DEFAULT_CONFIG.sandbox,
       ...(partial.sandbox ?? {}),
     },
+    security: {
+      ...DEFAULT_CONFIG.security,
+      ...(partial.security ?? {}),
+    },
     knowledgeBase: {
       ...DEFAULT_CONFIG.knowledgeBase,
       ...(partial.knowledgeBase ?? {}),
@@ -28,30 +32,61 @@ export function parseConfig(input: unknown): ContextModeConfig {
       ...DEFAULT_CONFIG.logging,
       ...(partial.logging ?? {}),
     },
+    stats: {
+      ...DEFAULT_CONFIG.stats,
+      ...(partial.stats ?? {}),
+    },
   };
 }
 
 export function loadConfigFromEnv(): DeepPartial<ContextModeConfig> {
   const config: DeepPartial<ContextModeConfig> = {};
 
-  if (process.env['UCM_THRESHOLD_BYTES']) {
+  if (process.env['WCM_THRESHOLD_BYTES']) {
     config.compression = config.compression ?? {};
-    config.compression.thresholdBytes = parseInt(process.env['UCM_THRESHOLD_BYTES'], 10);
+    config.compression.thresholdBytes = parseInt(process.env['WCM_THRESHOLD_BYTES'], 10);
   }
 
-  if (process.env['UCM_MAX_OUTPUT_BYTES']) {
+  if (process.env['WCM_MAX_OUTPUT_BYTES']) {
     config.compression = config.compression ?? {};
-    config.compression.maxOutputBytes = parseInt(process.env['UCM_MAX_OUTPUT_BYTES'], 10);
+    config.compression.maxOutputBytes = parseInt(process.env['WCM_MAX_OUTPUT_BYTES'], 10);
   }
 
-  if (process.env['UCM_TIMEOUT_MS']) {
+  if (process.env['WCM_TIMEOUT_MS']) {
     config.sandbox = config.sandbox ?? {};
-    config.sandbox.timeoutMs = parseInt(process.env['UCM_TIMEOUT_MS'], 10);
+    config.sandbox.timeoutMs = parseInt(process.env['WCM_TIMEOUT_MS'], 10);
   }
 
-  if (process.env['UCM_DB_PATH']) {
+  if (process.env['WCM_SHELL']) {
+    config.sandbox = config.sandbox ?? {};
+    const shell = process.env['WCM_SHELL'];
+    if (shell === 'powershell' || shell === 'cmd' || shell === 'git-bash') {
+      config.sandbox.shellDefault = shell;
+    }
+  }
+
+  if (process.env['WCM_POLICY_MODE']) {
+    config.security = config.security ?? {};
+    const mode = process.env['WCM_POLICY_MODE'];
+    if (mode === 'strict' || mode === 'balanced' || mode === 'permissive') {
+      config.security.policyMode = mode;
+    }
+  }
+
+  if (process.env['WCM_DB_PATH']) {
     config.knowledgeBase = config.knowledgeBase ?? {};
-    config.knowledgeBase.dbPath = process.env['UCM_DB_PATH'];
+    config.knowledgeBase.dbPath = process.env['WCM_DB_PATH'];
+  }
+
+  if (process.env['WCM_STATS_FOOTER']) {
+    config.stats = config.stats ?? {};
+    config.stats.footerEnabled =
+      process.env['WCM_STATS_FOOTER'].toLowerCase() !== 'false';
+  }
+
+  if (process.env['WCM_STATS_EXPORT_PATH']) {
+    config.stats = config.stats ?? {};
+    config.stats.exportPath = process.env['WCM_STATS_EXPORT_PATH'];
   }
 
   if (process.env['LOG_LEVEL']) {

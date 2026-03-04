@@ -10,6 +10,10 @@ export interface ContextModeConfig {
     timeoutMs: number;
     memoryMB: number;
     preferBun: boolean;
+    shellDefault: 'powershell' | 'cmd' | 'git-bash';
+  };
+  security: {
+    policyMode: 'strict' | 'balanced' | 'permissive';
   };
   knowledgeBase: {
     dbPath: string; // Will be set to OS temp by default
@@ -19,6 +23,10 @@ export interface ContextModeConfig {
   };
   logging: {
     level: 'debug' | 'info' | 'warn' | 'error';
+  };
+  stats: {
+    footerEnabled: boolean;
+    exportPath?: string;
   };
 }
 
@@ -37,14 +45,21 @@ export const DEFAULT_CONFIG: ContextModeConfig = {
     timeoutMs: 30_000,
     memoryMB: 256,
     preferBun: true,
+    shellDefault: 'powershell',
+  },
+  security: {
+    policyMode: 'strict',
   },
   knowledgeBase: {
-    dbPath: join(tmpdir(), 'universal-context-mode.db'),
+    dbPath: join(tmpdir(), 'windows-context-mode.db'),
     maxChunkSize: 1500,
     chunkOverlap: 100,
     searchTopK: 5,
   },
   logging: {
     level: 'info',
+  },
+  stats: {
+    footerEnabled: true,
   },
 };

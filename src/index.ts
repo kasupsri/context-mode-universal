@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 /**
- * universal-context-mode — MCP server entry point
+ * windows-context-mode — MCP server entry point
  *
- * Compresses tool outputs before they enter the AI's context window.
- * Works with Claude Code, Cursor, Windsurf, GitHub Copilot, and any MCP host.
+ * Windows-first MCP server for safe execution and context compression.
  */
 
 import { createServer } from './server.js';
 import { logger } from './utils/logger.js';
 import { loadConfigFromEnv, parseConfig } from './config/schema.js';
+import { DEFAULT_CONFIG } from './config/defaults.js';
 import { runSetup } from './adapters/generic.js';
+import { doctorTool } from './tools/doctor.js';
 
 const args = process.argv.slice(2);
 
@@ -20,6 +21,16 @@ if (args[0] === 'setup') {
     logger.error('Setup failed', err);
     process.exit(1);
   });
+} else if (args[0] === 'doctor') {
+  const merged = parseConfig(loadConfigFromEnv());
+  Object.assign(DEFAULT_CONFIG.compression, merged.compression);
+  Object.assign(DEFAULT_CONFIG.sandbox, merged.sandbox);
+  Object.assign(DEFAULT_CONFIG.security, merged.security);
+  Object.assign(DEFAULT_CONFIG.knowledgeBase, merged.knowledgeBase);
+  Object.assign(DEFAULT_CONFIG.logging, merged.logging);
+  Object.assign(DEFAULT_CONFIG.stats, merged.stats);
+  // eslint-disable-next-line no-console
+  console.log(doctorTool());
 } else {
   // Start MCP server
   startServer().catch(err => {
@@ -29,10 +40,15 @@ if (args[0] === 'setup') {
 }
 
 async function startServer() {
-  const envConfig = loadConfigFromEnv();
-  parseConfig(envConfig); // validate config on startup
+  const merged = parseConfig(loadConfigFromEnv());
+  Object.assign(DEFAULT_CONFIG.compression, merged.compression);
+  Object.assign(DEFAULT_CONFIG.sandbox, merged.sandbox);
+  Object.assign(DEFAULT_CONFIG.security, merged.security);
+  Object.assign(DEFAULT_CONFIG.knowledgeBase, merged.knowledgeBase);
+  Object.assign(DEFAULT_CONFIG.logging, merged.logging);
+  Object.assign(DEFAULT_CONFIG.stats, merged.stats);
 
-  logger.info('Starting universal-context-mode MCP server', { pid: process.pid });
+  logger.info('Starting windows-context-mode MCP server', { pid: process.pid });
 
   const { server, transport } = createServer();
 

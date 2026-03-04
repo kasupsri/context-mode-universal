@@ -1,4 +1,8 @@
-import { execFileSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
+import { existsSync } from 'fs';
+import { DEFAULT_CONFIG } from '../config/defaults.js';
+
+export type ShellRuntime = 'powershell' | 'cmd' | 'git-bash';
 
 export type Language =
   | 'javascript'
@@ -8,6 +12,8 @@ export type Language =
   | 'python'
   | 'py'
   | 'shell'
+  | 'powershell'
+  | 'cmd'
   | 'bash'
   | 'sh'
   | 'ruby'
@@ -26,6 +32,19 @@ export interface Runtime {
   args: (filePath: string) => string[];
   extension: string;
   available: boolean;
+  runtimeId?: ShellRuntime;
+}
+
+const isWindows = process.platform === 'win32';
+
+function commandExists(cmd: string): boolean {
+  try {
+    const probe = isWindows ? `where ${cmd}` : `command -v ${cmd}`;
+    execSync(probe, { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function isAvailable(cmd: string): boolean {
@@ -46,9 +65,44 @@ function hasBun(): boolean {
   }
 }
 
-const bunAvailable = hasBun();
+function detectPowerShellCommand(): string | null {
+  if (commandExists('pwsh')) return 'pwsh';
+  if (commandExists('powershell')) return 'powershell';
+  return null;
+}
 
-export const RUNTIMES: Runtime[] = [
+function detectGitBashPath(): string | null {
+  const knownPaths = [
+    'C:\\Program Files\\Git\\usr\\bin\\bash.exe',
+    'C:\\Program Files (x86)\\Git\\usr\\bin\\bash.exe',
+  ];
+  for (const p of knownPaths) {
+    if (existsSync(p)) return p;
+  }
+
+  if (!isWindows) return commandExists('bash') ? 'bash' : null;
+
+  try {
+    const out = execSync('where bash', { encoding: 'utf8', stdio: 'pipe' });
+    const candidates = out
+      .split(/\r?\n/)
+      .map(x => x.trim())
+      .filter(Boolean);
+    for (const p of candidates) {
+      const lower = p.toLowerCase();
+      if (lower.includes('system32') || lower.includes('windowsapps')) continue;
+      return p;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+const bunAvailable = hasBun();
+const pythonCommand = isAvailable('python3') ? 'python3' : isAvailable('python') ? 'python' : null;
+
+const NON_SHELL_RUNTIMES: Runtime[] = [
   {
     language: 'javascript',
     command: bunAvailable ? 'bun' : 'node',
@@ -79,38 +133,17 @@ export const RUNTIMES: Runtime[] = [
   },
   {
     language: 'python',
-    command: 'python3',
+    command: pythonCommand ?? 'python',
     args: f => [f],
     extension: 'py',
-    available: isAvailable('python3') || isAvailable('python'),
+    available: pythonCommand !== null,
   },
   {
     language: 'py',
-    command: 'python3',
+    command: pythonCommand ?? 'python',
     args: f => [f],
     extension: 'py',
-    available: isAvailable('python3'),
-  },
-  {
-    language: 'shell',
-    command: 'bash',
-    args: f => [f],
-    extension: 'sh',
-    available: isAvailable('bash'),
-  },
-  {
-    language: 'bash',
-    command: 'bash',
-    args: f => [f],
-    extension: 'sh',
-    available: isAvailable('bash'),
-  },
-  {
-    language: 'sh',
-    command: 'sh',
-    args: f => [f],
-    extension: 'sh',
-    available: true, // sh is nearly always available
+    available: pythonCommand !== null,
   },
   {
     language: 'ruby',
@@ -132,6 +165,20 @@ export const RUNTIMES: Runtime[] = [
     args: f => ['run', f],
     extension: 'go',
     available: isAvailable('go'),
+  },
+  {
+    language: 'rust',
+    command: 'rustc',
+    args: f => [f],
+    extension: 'rs',
+    available: isAvailable('rustc'),
+  },
+  {
+    language: 'rs',
+    command: 'rustc',
+    args: f => [f],
+    extension: 'rs',
+    available: isAvailable('rustc'),
   },
   {
     language: 'php',
@@ -163,10 +210,140 @@ export const RUNTIMES: Runtime[] = [
   },
 ];
 
-export function getRuntimeForLanguage(language: Language): Runtime | undefined {
-  return RUNTIMES.find(r => r.language === language && r.available);
+function shellCandidates(preferred: ShellRuntime): ShellRuntime[] {
+  if (preferred === 'cmd') return ['cmd', 'powershell', 'git-bash'];
+  if (preferred === 'git-bash') return ['git-bash', 'powershell', 'cmd'];
+  return ['powershell', 'cmd', 'git-bash'];
 }
 
-export function getAvailableRuntimes(): Runtime[] {
-  return RUNTIMES.filter(r => r.available);
+function buildShellRuntime(kind: ShellRuntime): Runtime | null {
+  if (!isWindows) {
+    if (kind === 'git-bash' && commandExists('bash')) {
+      return {
+        language: 'shell',
+        command: 'bash',
+        args: f => [f],
+        extension: 'sh',
+        available: true,
+        runtimeId: 'git-bash',
+      };
+    }
+    if (kind === 'powershell' && detectPowerShellCommand()) {
+      const ps = detectPowerShellCommand();
+      if (!ps) return null;
+      return {
+        language: 'shell',
+        command: ps,
+        args: f => ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', f],
+        extension: 'ps1',
+        available: true,
+        runtimeId: 'powershell',
+      };
+    }
+    if (kind === 'cmd') return null;
+    if (commandExists('sh')) {
+      return {
+        language: 'shell',
+        command: 'sh',
+        args: f => [f],
+        extension: 'sh',
+        available: true,
+        runtimeId: 'git-bash',
+      };
+    }
+    return null;
+  }
+
+  if (kind === 'powershell') {
+    const ps = detectPowerShellCommand();
+    if (!ps) return null;
+    return {
+      language: 'shell',
+      command: ps,
+      args: f => ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', f],
+      extension: 'ps1',
+      available: true,
+      runtimeId: 'powershell',
+    };
+  }
+
+  if (kind === 'cmd') {
+    if (!commandExists('cmd')) return null;
+    return {
+      language: 'shell',
+      command: 'cmd.exe',
+      args: f => ['/d', '/s', '/c', f],
+      extension: 'cmd',
+      available: true,
+      runtimeId: 'cmd',
+    };
+  }
+
+  const gitBash = detectGitBashPath();
+  if (!gitBash) return null;
+  return {
+    language: 'shell',
+    command: gitBash,
+    args: f => [f.replace(/\\/g, '/')],
+    extension: 'sh',
+    available: true,
+    runtimeId: 'git-bash',
+  };
+}
+
+export function isShellLanguage(
+  language: Language
+): language is Extract<Language, 'shell' | 'powershell' | 'cmd' | 'bash' | 'sh'> {
+  return (
+    language === 'shell' ||
+    language === 'powershell' ||
+    language === 'cmd' ||
+    language === 'bash' ||
+    language === 'sh'
+  );
+}
+
+export function resolveShellRuntime(
+  language: Extract<Language, 'shell' | 'powershell' | 'cmd' | 'bash' | 'sh'>,
+  preferredShell?: ShellRuntime
+): Runtime | undefined {
+  let preferred: ShellRuntime;
+  if (language === 'powershell') preferred = 'powershell';
+  else if (language === 'cmd') preferred = 'cmd';
+  else if (language === 'bash' || language === 'sh') preferred = 'git-bash';
+  else preferred = preferredShell ?? DEFAULT_CONFIG.sandbox.shellDefault;
+
+  for (const candidate of shellCandidates(preferred)) {
+    const runtime = buildShellRuntime(candidate);
+    if (runtime?.available) return runtime;
+  }
+  return undefined;
+}
+
+export function getRuntimeForLanguage(
+  language: Language,
+  preferredShell?: ShellRuntime
+): Runtime | undefined {
+  if (isShellLanguage(language)) {
+    return resolveShellRuntime(language, preferredShell);
+  }
+  return NON_SHELL_RUNTIMES.find(r => r.language === language && r.available);
+}
+
+export function getAvailableRuntimes(preferredShell?: ShellRuntime): Runtime[] {
+  const available = NON_SHELL_RUNTIMES.filter(r => r.available);
+  const shellLanguages: Array<Extract<Language, 'shell' | 'powershell' | 'cmd' | 'bash' | 'sh'>> = [
+    'shell',
+    'powershell',
+    'cmd',
+    'bash',
+    'sh',
+  ];
+  for (const language of shellLanguages) {
+    const shell = resolveShellRuntime(language, preferredShell);
+    if (shell) {
+      available.push({ ...shell, language });
+    }
+  }
+  return available;
 }

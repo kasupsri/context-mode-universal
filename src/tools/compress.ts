@@ -26,6 +26,10 @@ export function compressTool(input: CompressToolInput): string {
 
   statsTracker.record('compress', input.content, result.output, result.strategy);
 
+  if (!DEFAULT_CONFIG.stats.footerEnabled) {
+    return result.output;
+  }
+
   const footer = [
     '',
     '---',

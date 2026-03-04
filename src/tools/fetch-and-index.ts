@@ -12,7 +12,7 @@ async function fetchAndConvertToMarkdown(url: string): Promise<string> {
   // Use built-in fetch (Node 18+)
   const response = await fetch(url, {
     headers: {
-      'User-Agent': 'universal-context-mode/0.1.0 (MCP Server)',
+      'User-Agent': 'windows-context-mode/0.1.0 (MCP Server)',
       Accept: 'text/html,application/xhtml+xml,text/plain',
     },
     signal: AbortSignal.timeout(15_000),

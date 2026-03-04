@@ -17,19 +17,20 @@ const MCP_CONFIG = (pkg: string) =>
   );
 
 const CURSOR_RULES = `---
-description: Route large outputs through context-mode to preserve context window
+description: Route large outputs through windows-context-mode to preserve context window
 globs: ["**/*"]
 alwaysApply: true
 ---
 
 ## Context Preservation Rules
 
-When executing commands that may produce large output (>5KB), use the \`context-mode\` MCP tools:
+When executing commands that may produce large output (>5KB), use the \`windows-context-mode\` MCP tools:
 
-- Instead of running shell commands directly, use \`context-mode.execute\` with \`language: "shell"\`
-- Instead of reading large files, use \`context-mode.execute_file\`
-- When fetching documentation, use \`context-mode.fetch_and_index\` + \`context-mode.search\`
-- For any tool returning large output, use \`context-mode.compress\` to wrap it
+- Prefer \`execute({ language: "shell" })\` for PowerShell-first safe execution
+- Use \`execute_file\` for large local files
+- Use \`fetch_and_index\` + \`search\` for docs
+- Use \`compress\` for arbitrary large text
+- Use \`stats_get\` to monitor token savings
 
 ### Commands likely to produce large output
 - \`git log\`, \`git diff\`, \`cat\` large files, \`find\`, reading log files
@@ -48,6 +49,9 @@ execute_file({ file_path: "package-lock.json", code: "const d=JSON.parse(process
 
 // Compress any large text
 compress({ content: largeOutput, intent: "find error messages" })
+
+// View token/context savings
+stats_get({})
 \`\`\`
 `;
 
