@@ -1,6 +1,6 @@
 # Compression Benchmarks
 
-> Last updated: 2026-03-04 | Node.js v22.19.0
+> Last updated: 2026-03-05 | Node.js v22.15.0
 
 All compression is algorithmic — no LLM calls, no API dependencies.
 Benchmarks run with `max_output_tokens: 2000` (8KB target output).

@@ -14,26 +14,28 @@ const MCP_CONFIG = (pkg: string) => ({
 
 const COPILOT_INSTRUCTIONS = `# Context-Mode Instructions for GitHub Copilot
 
-## When working with large outputs
+## Response Optimization
 
-Route large tool outputs through context-mode MCP tools to preserve the context window:
+Route tool outputs through context-mode MCP tools to preserve context and minimize tokens:
 
-### For shell commands producing large output
+### For shell commands
 Use \`context-mode.execute\` with an intent parameter:
 \`\`\`
 context-mode.execute({
   language: "shell",
   code: "git log --oneline -50",
-  intent: "find commits related to the bug fix"
+  intent: "find commits related to the bug fix",
+  max_output_tokens: 800
 })
 \`\`\`
 
-### For large files
+### For files
 Use \`context-mode.execute_file\`:
 \`\`\`
 context-mode.execute_file({
   file_path: "/absolute/path/to/file.json",
-  code: "const d = JSON.parse(process.env.FILE_CONTENT); console.log(Object.keys(d).join(', '))"
+  code: "const d = JSON.parse(process.env.FILE_CONTENT); console.log(Object.keys(d).join(', '))",
+  max_output_tokens: 600
 })
 \`\`\`
 
@@ -46,10 +48,10 @@ context-mode.search({ query: "relevant topic" })
 
 ### For any large text
 \`\`\`
-context-mode.compress({ content: largeText, intent: "find error messages" })
+context-mode.compress({ content: largeText, intent: "find error messages", max_output_tokens: 600 })
 \`\`\`
 
-## Commands that often produce large output
+## Commands with high optimization impact
 - git log, git diff, git show
 - npm list, yarn why, pip list, cargo tree
 - cat on files > 200 lines

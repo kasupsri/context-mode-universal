@@ -69,12 +69,6 @@ export function parseConfig(input: unknown): ContextModeConfig {
 export function loadConfigFromEnv(): DeepPartial<ContextModeConfig> {
   const config: DeepPartial<ContextModeConfig> = {};
 
-  const thresholdBytes = parsePositiveInt(process.env['WCM_THRESHOLD_BYTES']);
-  if (thresholdBytes !== undefined) {
-    config.compression = config.compression ?? {};
-    config.compression.thresholdBytes = thresholdBytes;
-  }
-
   const maxOutputBytes = parsePositiveInt(process.env['WCM_MAX_OUTPUT_BYTES']);
   if (maxOutputBytes !== undefined) {
     config.compression = config.compression ?? {};
@@ -142,12 +136,6 @@ export function loadConfigFromEnv(): DeepPartial<ContextModeConfig> {
   if (maxFetchBytes !== undefined) {
     config.knowledgeBase = config.knowledgeBase ?? {};
     config.knowledgeBase.maxFetchBytes = maxFetchBytes;
-  }
-
-  const footerEnabled = parseBoolean(process.env['WCM_STATS_FOOTER']);
-  if (footerEnabled !== undefined) {
-    config.stats = config.stats ?? {};
-    config.stats.footerEnabled = footerEnabled;
   }
 
   if (process.env['WCM_STATS_EXPORT_PATH']) {

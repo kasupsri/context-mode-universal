@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { compress, detectContentType } from '../../src/compression/strategies.js';
-import { DEFAULT_CONFIG } from '../../src/config/defaults.js';
 
 // ─── Content Type Detection ────────────────────────────────────────────────
 
@@ -56,10 +55,10 @@ Bob,25,LA`;
 // ─── Compression ────────────────────────────────────────────────────────────
 
 describe('compress', () => {
-  it('returns as-is for small content below threshold', () => {
+  it('keeps small content exact while still using a strategy', () => {
     const small = 'Hello world';
     const result = compress(small);
-    expect(result.strategy).toBe('as-is');
+    expect(result.strategy).toBe('summarize');
     expect(result.output).toBe(small);
   });
 
@@ -112,12 +111,12 @@ describe('compress', () => {
 
   it('compresses markdown to outline', () => {
     const sections = ['Introduction', 'Installation', 'Configuration', 'API Reference', 'Examples'];
-    // Each section has 300 words to ensure we exceed the 5KB threshold
+    // Each section has 300 words to ensure this is a large document.
     const md = sections
       .map(s => `# ${s}\n\nThis section covers ${s} topics in depth.\n\n${`word `.repeat(300)}`)
       .join('\n\n');
 
-    expect(md.length).toBeGreaterThan(5120); // must be above threshold
+    expect(md.length).toBeGreaterThan(5120);
 
     const result = compress(md, { maxOutputChars: 5000 });
     expect(result.contentType).toBe('markdown');
@@ -158,25 +157,12 @@ Log all exceptions.
     expect(result.output).toContain('omitted');
   });
 
-  it('compresses when max output budget is lower than threshold', () => {
-    const text = 'Line with repeated content\n'.repeat(120); // ~3KB, below default threshold
+  it('compresses when max output budget is small', () => {
+    const text = 'Line with repeated content\n'.repeat(120);
     const result = compress(text, { maxOutputChars: 500 });
 
     expect(result.strategy).not.toBe('as-is');
     expect(result.outputChars).toBeLessThanOrEqual(500);
-  });
-
-  it('uses configured threshold from runtime config', () => {
-    const originalThreshold = DEFAULT_CONFIG.compression.thresholdBytes;
-    try {
-      DEFAULT_CONFIG.compression.thresholdBytes = 10_000;
-      const text = 'x'.repeat(6000);
-      const result = compress(text);
-      expect(result.strategy).toBe('as-is');
-      expect(result.output).toBe(text);
-    } finally {
-      DEFAULT_CONFIG.compression.thresholdBytes = originalThreshold;
-    }
   });
 
   it('compresses CSV with stats', () => {

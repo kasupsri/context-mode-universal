@@ -17,22 +17,23 @@ const MCP_CONFIG = (pkg: string) =>
   );
 
 const CURSOR_RULES = `---
-description: Route large outputs through windows-context-mode to preserve context window
+description: Route all tool outputs through windows-context-mode for minimum-token responses
 globs: ["**/*"]
 alwaysApply: true
 ---
 
 ## Context Preservation Rules
 
-When executing commands that may produce large output (>5KB), use the \`windows-context-mode\` MCP tools:
+Use \`windows-context-mode\` MCP tools for substantial tool interactions:
 
 - Prefer \`execute({ language: "shell" })\` for PowerShell-first safe execution
 - Use \`execute_file\` for large local files
 - Use \`fetch_and_index\` + \`search\` for docs
 - Use \`compress\` for arbitrary large text
-- Use \`stats_get\` to monitor token savings
+- Use \`max_output_tokens\` on any tool call to enforce strict response budgets
+- Use \`stats_get\` to monitor optimization impact
 
-### Commands likely to produce large output
+### Commands with high optimization impact
 - \`git log\`, \`git diff\`, \`cat\` large files, \`find\`, reading log files
 - \`npm list\`, \`pip list\`, dependency audits, \`yarn why\`
 - API responses, test suite output (>100 tests)
@@ -42,13 +43,13 @@ When executing commands that may produce large output (>5KB), use the \`windows-
 
 \`\`\`
 // Instead of: bash("git log --oneline -50")
-execute({ language: "shell", code: "git log --oneline -50", intent: "recent changes" })
+execute({ language: "shell", code: "git log --oneline -50", intent: "recent changes", max_output_tokens: 800 })
 
 // Instead of: read_file("package-lock.json")
 execute_file({ file_path: "package-lock.json", code: "const d=JSON.parse(process.env.FILE_CONTENT); console.log('Packages:', Object.keys(d.dependencies||{}).length)" })
 
 // Compress any large text
-compress({ content: largeOutput, intent: "find error messages" })
+compress({ content: largeOutput, intent: "find error messages", max_output_tokens: 600 })
 
 // View token/context savings
 stats_get({})
@@ -91,7 +92,7 @@ export class CursorAdapter implements BaseAdapter {
       nextSteps: [
         '1. Restart Cursor to load the new MCP server',
         '2. Open the MCP panel (Ctrl+Shift+P → "MCP: Show Panel") to verify connection',
-        '3. The context-mode rules will automatically guide the agent to compress large outputs',
+        '3. The context-mode rules will automatically guide the agent toward minimum-token outputs',
       ],
     };
   }

@@ -2,7 +2,11 @@ import { DEFAULT_CONFIG } from '../config/defaults.js';
 import { getAvailableRuntimes, getRuntimeForLanguage } from '../sandbox/runtimes.js';
 import { evaluateCommand, evaluateFilePath } from '../security/policy.js';
 
-export function doctorTool(): string {
+export interface DoctorToolInput {
+  max_output_tokens?: number;
+}
+
+export function doctorTool(_input: DoctorToolInput = {}): string {
   const runtimes = getAvailableRuntimes();
   const shell = getRuntimeForLanguage('shell', DEFAULT_CONFIG.sandbox.shellDefault);
   const shellRuntime = shell?.runtimeId ?? shell?.command ?? 'unavailable';
@@ -19,9 +23,7 @@ export function doctorTool(): string {
     `Resolved shell runtime: ${shellRuntime}`,
     `Policy mode: ${DEFAULT_CONFIG.security.policyMode}`,
     `Private-network fetches: ${DEFAULT_CONFIG.security.allowPrivateNetworkFetch ? 'allowed' : 'blocked'}`,
-    `Stats footer: ${DEFAULT_CONFIG.stats.footerEnabled ? 'enabled' : 'disabled'}`,
     `Stats max events: ${DEFAULT_CONFIG.stats.maxEvents}`,
-    `Compression threshold: ${DEFAULT_CONFIG.compression.thresholdBytes} bytes`,
     `Max output bytes: ${DEFAULT_CONFIG.compression.maxOutputBytes} bytes`,
     `Execution timeout: ${DEFAULT_CONFIG.sandbox.timeoutMs} ms`,
     `Max execute_file size: ${DEFAULT_CONFIG.sandbox.maxFileBytes} bytes`,

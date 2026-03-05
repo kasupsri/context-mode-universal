@@ -1,5 +1,4 @@
-import { compress, type CompressionStrategy } from '../compression/strategies.js';
-import { statsTracker } from '../utils/stats-tracker.js';
+import { type CompressionStrategy } from '../compression/strategies.js';
 import { DEFAULT_CONFIG } from '../config/defaults.js';
 import { executeCode } from '../sandbox/executor.js';
 import { type Language, type ShellRuntime } from '../sandbox/runtimes.js';
@@ -19,21 +18,7 @@ export interface ProxyToolInput {
   max_output_tokens?: number;
 }
 
-function maybeAppendFooter(rawOutput: string, compressedOutput: string, strategy: string): string {
-  if (!DEFAULT_CONFIG.stats.footerEnabled) {
-    return compressedOutput;
-  }
-  return compressedOutput + statsTracker.formatStatsFooter(rawOutput, compressedOutput, strategy);
-}
-
 export async function proxyTool(input: ProxyToolInput): Promise<string> {
-  const maxChars =
-    typeof input.max_output_tokens === 'number' &&
-    Number.isFinite(input.max_output_tokens) &&
-    input.max_output_tokens > 0
-      ? Math.floor(input.max_output_tokens * 4)
-      : DEFAULT_CONFIG.compression.maxOutputBytes;
-
   let rawOutput: string;
 
   switch (input.tool) {
@@ -151,16 +136,5 @@ export async function proxyTool(input: ProxyToolInput): Promise<string> {
     }
   }
 
-  const compressed = compress(rawOutput, {
-    intent: input.intent,
-    strategy: input.strategy ?? 'auto',
-    maxOutputChars: maxChars,
-  });
-
-  if (compressed.strategy !== 'as-is') {
-    statsTracker.record(`proxy:${input.tool}`, rawOutput, compressed.output, compressed.strategy);
-    return maybeAppendFooter(rawOutput, compressed.output, compressed.strategy);
-  }
-
-  return compressed.output;
+  return rawOutput;
 }

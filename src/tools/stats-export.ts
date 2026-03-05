@@ -3,6 +3,7 @@ import { statsTracker } from '../utils/stats-tracker.js';
 
 export interface StatsExportInput {
   path?: string;
+  max_output_tokens?: number;
 }
 
 export async function statsExportTool(input: StatsExportInput): Promise<string> {

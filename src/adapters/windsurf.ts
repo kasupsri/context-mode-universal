@@ -19,7 +19,7 @@ const MCP_CONFIG = (pkg: string) =>
 const CASCADE_RULES = `# Context Mode Rules for Windsurf Cascade
 
 ## Purpose
-Route large tool outputs through context-mode to preserve the context window.
+Route tool outputs through context-mode for minimum-token responses.
 
 ## When to Use Context-Mode Tools
 
@@ -32,13 +32,14 @@ Use \`context-mode.execute\` instead of direct shell commands for:
 
 Use \`context-mode.fetch_and_index\` + \`context-mode.search\` instead of reading documentation URLs directly.
 
-Use \`context-mode.compress\` for any large text you already have.
+Use \`context-mode.compress\` for any text you already have.
+Use \`max_output_tokens\` on tool calls to enforce strict response budgets.
 
 ## Examples
 
 \`\`\`javascript
 // Large git history
-execute({ language: "shell", code: "git log --oneline -100", intent: "find commits related to authentication" })
+execute({ language: "shell", code: "git log --oneline -100", intent: "find commits related to authentication", max_output_tokens: 900 })
 
 // Large file analysis
 execute_file({
@@ -92,7 +93,7 @@ export class WindsurfAdapter implements BaseAdapter {
       nextSteps: [
         '1. Restart Windsurf to load the new MCP server',
         '2. Open Settings → MCP to verify "context-mode" appears',
-        '3. The Cascade rules will guide the AI to use context-mode for large outputs',
+        '3. The Cascade rules will guide the AI toward minimum-token outputs',
       ],
     };
   }

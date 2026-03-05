@@ -1,6 +1,5 @@
 export interface ContextModeConfig {
   compression: {
-    thresholdBytes: number; // Don't compress below this size
     maxOutputBytes: number; // Target max output size
     defaultStrategy: 'auto' | 'truncate' | 'summarize' | 'filter';
     headLines: number; // Lines to keep from start (generic truncate)
@@ -29,7 +28,6 @@ export interface ContextModeConfig {
     level: 'debug' | 'info' | 'warn' | 'error';
   };
   stats: {
-    footerEnabled: boolean;
     exportPath?: string;
     maxEvents: number;
   };
@@ -40,7 +38,6 @@ import { join } from 'path';
 
 export const DEFAULT_CONFIG: ContextModeConfig = {
   compression: {
-    thresholdBytes: 5 * 1024, // 5KB
     maxOutputBytes: 8 * 1024, // 8KB target output
     defaultStrategy: 'auto',
     headLines: 50,
@@ -69,7 +66,6 @@ export const DEFAULT_CONFIG: ContextModeConfig = {
     level: 'info',
   },
   stats: {
-    footerEnabled: true,
     maxEvents: 1000,
   },
 };

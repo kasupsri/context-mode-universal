@@ -18,6 +18,9 @@ import { statsResetTool } from './tools/stats-reset.js';
 import { statsExportTool } from './tools/stats-export.js';
 import { doctorTool } from './tools/doctor.js';
 import { logger } from './utils/logger.js';
+import { optimizeResponse } from './compression/response-optimizer.js';
+import { statsTracker } from './utils/stats-tracker.js';
+import { type CompressionStrategy } from './compression/strategies.js';
 
 const TOOLS: Tool[] = [
   {
@@ -72,6 +75,7 @@ const TOOLS: Tool[] = [
         code: { type: 'string' },
         intent: { type: 'string' },
         timeout: { type: 'number' },
+        max_output_tokens: { type: 'number' },
       },
       required: ['file_path', 'code'],
     },
@@ -86,6 +90,7 @@ const TOOLS: Tool[] = [
         source: { type: 'string' },
         kb_name: { type: 'string' },
         chunk_size: { type: 'number' },
+        max_output_tokens: { type: 'number' },
       },
       required: ['content'],
     },
@@ -99,6 +104,7 @@ const TOOLS: Tool[] = [
         query: { type: 'string' },
         kb_name: { type: 'string' },
         top_k: { type: 'number' },
+        max_output_tokens: { type: 'number' },
       },
       required: ['query'],
     },
@@ -112,6 +118,7 @@ const TOOLS: Tool[] = [
         url: { type: 'string' },
         kb_name: { type: 'string' },
         chunk_size: { type: 'number' },
+        max_output_tokens: { type: 'number' },
       },
       required: ['url'],
     },
@@ -148,12 +155,22 @@ const TOOLS: Tool[] = [
   {
     name: 'stats_get',
     description: 'Show session token/context savings and per-tool breakdown.',
-    inputSchema: { type: 'object', properties: {} },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        max_output_tokens: { type: 'number' },
+      },
+    },
   },
   {
     name: 'stats_reset',
     description: 'Reset in-memory session compression statistics.',
-    inputSchema: { type: 'object', properties: {} },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        max_output_tokens: { type: 'number' },
+      },
+    },
   },
   {
     name: 'stats_export',
@@ -162,13 +179,19 @@ const TOOLS: Tool[] = [
       type: 'object',
       properties: {
         path: { type: 'string' },
+        max_output_tokens: { type: 'number' },
       },
     },
   },
   {
     name: 'doctor',
     description: 'Run local diagnostics for runtime resolution, policy mode, and safety checks.',
-    inputSchema: { type: 'object', properties: {} },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        max_output_tokens: { type: 'number' },
+      },
+    },
   },
 ];
 
@@ -183,6 +206,49 @@ interface ToolSchema {
 }
 
 const TOOL_BY_NAME = new Map(TOOLS.map(tool => [tool.name, tool]));
+
+const OPTIMIZATION_STRATEGIES: ReadonlySet<CompressionStrategy> = new Set([
+  'auto',
+  'truncate',
+  'summarize',
+  'filter',
+  'as-is',
+]);
+
+function asObject(input: unknown): Record<string, unknown> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return {};
+  }
+  return input as Record<string, unknown>;
+}
+
+function getOptimizationHints(args: unknown): {
+  intent?: string;
+  maxOutputTokens?: number;
+  preferredStrategy?: CompressionStrategy;
+} {
+  const parsed = asObject(args);
+  const rawIntent = parsed['intent'];
+  const rawMax = parsed['max_output_tokens'];
+  const rawStrategy = parsed['strategy'];
+
+  const intent = typeof rawIntent === 'string' && rawIntent.trim() ? rawIntent : undefined;
+  const maxOutputTokens =
+    typeof rawMax === 'number' && Number.isFinite(rawMax) && rawMax > 0
+      ? Math.floor(rawMax)
+      : undefined;
+  const preferredStrategy =
+    typeof rawStrategy === 'string' &&
+    OPTIMIZATION_STRATEGIES.has(rawStrategy as CompressionStrategy)
+      ? (rawStrategy as CompressionStrategy)
+      : undefined;
+
+  return { intent, maxOutputTokens, preferredStrategy };
+}
+
+function shouldRecordStats(toolName: string): boolean {
+  return toolName !== 'stats_get' && toolName !== 'stats_reset';
+}
 
 function validateToolArguments(tool: Tool, args: unknown): string | null {
   const schema = tool.inputSchema as ToolSchema;
@@ -270,11 +336,13 @@ export function createServer(): { server: Server; transport: StdioServerTranspor
   server.setRequestHandler(CallToolRequestSchema, async request => {
     const { name, arguments: args } = request.params;
     logger.debug('Tool called', { name, args });
+    const toolName = typeof name === 'string' ? name : 'unknown';
+    const hints = getOptimizationHints(args);
 
     try {
-      const tool = TOOL_BY_NAME.get(name);
+      const tool = TOOL_BY_NAME.get(toolName);
       if (!tool) {
-        throw new Error(`Unknown tool: ${name}`);
+        throw new Error(`Unknown tool: ${toolName}`);
       }
 
       const validationError = validateToolArguments(tool, args);
@@ -285,7 +353,7 @@ export function createServer(): { server: Server; transport: StdioServerTranspor
       let result: string;
       const typedArgs: unknown = args ?? {};
 
-      switch (name) {
+      switch (toolName) {
         case 'execute':
           result = await executeTool(typedArgs as Parameters<typeof executeTool>[0]);
           break;
@@ -308,31 +376,74 @@ export function createServer(): { server: Server; transport: StdioServerTranspor
           result = await proxyTool(typedArgs as Parameters<typeof proxyTool>[0]);
           break;
         case 'stats_get':
-          result = statsGetTool();
+          result = statsGetTool(typedArgs as Parameters<typeof statsGetTool>[0]);
           break;
         case 'stats_reset':
-          result = statsResetTool();
+          result = statsResetTool(typedArgs as Parameters<typeof statsResetTool>[0]);
           break;
         case 'stats_export':
           result = await statsExportTool(typedArgs as Parameters<typeof statsExportTool>[0]);
           break;
         case 'doctor':
-          result = doctorTool();
+          result = doctorTool(typedArgs as Parameters<typeof doctorTool>[0]);
           break;
         default:
-          throw new Error(`Unhandled tool: ${name}`);
+          throw new Error(`Unhandled tool: ${toolName}`);
       }
 
-      logger.debug('Tool completed', { name, outputLength: result.length });
+      const optimized = optimizeResponse(result, {
+        intent: hints.intent,
+        maxOutputTokens: hints.maxOutputTokens,
+        preferredStrategy: hints.preferredStrategy,
+        toolName,
+        isError: false,
+      });
+
+      if (shouldRecordStats(toolName)) {
+        statsTracker.record(toolName, result, optimized.output, optimized.chosenStrategy, {
+          changed: optimized.changed,
+          budgetForced: optimized.budgetForced,
+          candidateCount: optimized.candidates.length,
+        });
+      }
+
+      logger.debug('Tool completed', {
+        name: toolName,
+        outputLength: optimized.output.length,
+        strategy: optimized.chosenStrategy,
+      });
 
       return {
-        content: [{ type: 'text', text: result }],
+        content: [{ type: 'text', text: optimized.output }],
       };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      logger.error('Tool error', { name, error: message });
+      const rawErrorText = `Error: ${message}`;
+      const optimized = optimizeResponse(rawErrorText, {
+        intent: hints.intent,
+        maxOutputTokens: hints.maxOutputTokens,
+        preferredStrategy: hints.preferredStrategy,
+        toolName,
+        isError: true,
+      });
+
+      if (shouldRecordStats(toolName)) {
+        statsTracker.record(
+          `${toolName}:error`,
+          rawErrorText,
+          optimized.output,
+          optimized.chosenStrategy,
+          {
+            changed: optimized.changed,
+            budgetForced: optimized.budgetForced,
+            candidateCount: optimized.candidates.length,
+          }
+        );
+      }
+
+      logger.error('Tool error', { name: toolName, error: message });
       return {
-        content: [{ type: 'text', text: `Error: ${message}` }],
+        content: [{ type: 'text', text: optimized.output }],
         isError: true,
       };
     }

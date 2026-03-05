@@ -1,4 +1,4 @@
-# Windows Context Mode: How It Works
+# WINDOWS CONTEXT MODE: HOW IT WORKS
 
 ## End-to-End Request Flow
 
@@ -10,13 +10,11 @@ flowchart TD
     C -->|no| E[Run tool logic]
     D -->|deny| F[Return blocked reason]
     D -->|allow| E
-    E --> G[Execute runtime or process content]
-    G --> H{Output exceeds threshold?}
-    H -->|yes| I[Compress output]
-    H -->|no| J[Return raw output]
-    I --> K[Record stats: bytes/tokens in/out]
-    K --> L[Return compact response]
-    J --> L
+    E --> G[Produce raw tool output]
+    G --> H[Generate optimization candidates]
+    H --> I[Select minimum-token valid candidate under budget]
+    I --> J[Record optimization stats]
+    J --> K[Return compact response]
 ```
 
 ## Shell Runtime Resolution (Windows-First)
@@ -49,10 +47,26 @@ Policy evaluation happens before execution:
 
 ## Compression and Stats
 
-- Large outputs are compressed using deterministic, content-aware strategies.
-- Compression tracks session-level bytes/tokens saved.
+- Every response is optimization-scored using deterministic, content-aware strategies.
+- The server returns the minimum-token valid candidate under the active budget.
+- Stats track processed/changed responses, budget-forced responses, and bytes/tokens saved.
 - `stats_get` returns in-memory totals and per-tool breakdown.
 - `stats_export` writes a JSON report (default location under `%TEMP%`).
+
+## Measured Improvement
+
+Measured on March 5, 2026 against the previous response path on a deterministic sample set:
+
+- Legacy output tokens: `3110`
+- Current output tokens: `2977`
+- Net reduction: `133 tokens` (`4.3%`)
+
+Breakdown highlights:
+
+- `git log` sample: `647 -> 619` tokens (`4.3%`)
+- `application logs` sample: `296 -> 267` tokens (`9.8%`)
+- `markdown docs` sample: `2077 -> 2048` tokens (`1.4%`)
+- `proxy guidance text`: `56 -> 9` tokens (`83.9%`)
 
 ## Knowledge Base Path
 

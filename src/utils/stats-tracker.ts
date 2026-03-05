@@ -11,12 +11,18 @@ export interface CompressionEvent {
   inputTokens: number;
   outputTokens: number;
   strategy: string;
+  changed: boolean;
+  budgetForced: boolean;
+  candidateCount?: number;
   timestamp: Date;
 }
 
 export interface ToolStats {
   tool: string;
   events: number;
+  responsesProcessed: number;
+  responsesChanged: number;
+  budgetForced: number;
   inputBytes: number;
   outputBytes: number;
   inputTokens: number;
@@ -34,6 +40,9 @@ export interface SessionStats {
   totalInputTokens: number;
   totalOutputTokens: number;
   totalEvents: number;
+  responsesProcessed: number;
+  responsesChanged: number;
+  budgetForced: number;
   bytesSaved: number;
   tokensSaved: number;
   savingsRatio: number;
@@ -42,12 +51,24 @@ export interface SessionStats {
   events: CompressionEvent[];
 }
 
+export interface RecordOptions {
+  changed?: boolean;
+  budgetForced?: boolean;
+  candidateCount?: number;
+}
+
 class StatsTracker {
   private readonly startedAt: Date = new Date();
   private events: CompressionEvent[] = [];
   private droppedEvents = 0;
 
-  record(tool: string, inputText: string, outputText: string, strategy: string): CompressionEvent {
+  record(
+    tool: string,
+    inputText: string,
+    outputText: string,
+    strategy: string,
+    options: RecordOptions = {}
+  ): CompressionEvent {
     const inputBytes = Buffer.byteLength(inputText, 'utf8');
     const outputBytes = Buffer.byteLength(outputText, 'utf8');
     const inputTokens = estimateTokens(inputText).tokens;
@@ -60,6 +81,9 @@ class StatsTracker {
       inputTokens,
       outputTokens,
       strategy,
+      changed: options.changed ?? inputText !== outputText,
+      budgetForced: options.budgetForced ?? false,
+      candidateCount: options.candidateCount,
       timestamp: new Date(),
     };
     this.events.push(event);
@@ -82,6 +106,9 @@ class StatsTracker {
     const bytesSaved = totalInputBytes - totalOutputBytes;
     const tokensSaved = totalInputTokens - totalOutputTokens;
     const savingsRatio = totalInputBytes > 0 ? (bytesSaved / totalInputBytes) * 100 : 0;
+    const responsesProcessed = this.events.length;
+    const responsesChanged = this.events.filter(e => e.changed).length;
+    const budgetForced = this.events.filter(e => e.budgetForced).length;
 
     const byToolMap = new Map<string, ToolStats>();
     for (const event of this.events) {
@@ -90,6 +117,9 @@ class StatsTracker {
         ({
           tool: event.tool,
           events: 0,
+          responsesProcessed: 0,
+          responsesChanged: 0,
+          budgetForced: 0,
           inputBytes: 0,
           outputBytes: 0,
           inputTokens: 0,
@@ -100,6 +130,9 @@ class StatsTracker {
         } as ToolStats);
 
       existing.events += 1;
+      existing.responsesProcessed += 1;
+      existing.responsesChanged += event.changed ? 1 : 0;
+      existing.budgetForced += event.budgetForced ? 1 : 0;
       existing.inputBytes += event.inputBytes;
       existing.outputBytes += event.outputBytes;
       existing.inputTokens += event.inputTokens;
@@ -121,6 +154,9 @@ class StatsTracker {
       totalInputTokens,
       totalOutputTokens,
       totalEvents: this.events.length,
+      responsesProcessed,
+      responsesChanged,
+      budgetForced,
       bytesSaved,
       tokensSaved,
       savingsRatio,
@@ -130,28 +166,13 @@ class StatsTracker {
     };
   }
 
-  formatStatsFooter(inputText: string, outputText: string, strategy: string): string {
-    const inputBytes = Buffer.byteLength(inputText, 'utf8');
-    const outputBytes = Buffer.byteLength(outputText, 'utf8');
-    const saved = inputBytes - outputBytes;
-    const ratio = inputBytes > 0 ? ((saved / inputBytes) * 100).toFixed(0) : '0';
-    const inputKB = (inputBytes / 1024).toFixed(1);
-    const outputKB = (outputBytes / 1024).toFixed(1);
-    const inputTokens = estimateTokens(inputText).tokens.toLocaleString();
-    const outputTokens = estimateTokens(outputText).tokens.toLocaleString();
-
-    return (
-      '\n---\n' +
-      `[windows-context-mode] Compressed: ${inputKB}KB/${inputTokens} tokens -> ` +
-      `${outputKB}KB/${outputTokens} tokens (${ratio}% saved, strategy: ${strategy})`
-    );
-  }
-
   formatSessionStatsText(): string {
     const stats = this.getSessionStats();
     const lines = [
       '=== Windows Context Mode Session Stats ===',
-      `Events: ${stats.totalEvents}`,
+      `Responses processed: ${stats.responsesProcessed}`,
+      `Responses changed: ${stats.responsesChanged}`,
+      `Budget-forced responses: ${stats.budgetForced}`,
       `Input: ${(stats.totalInputBytes / 1024).toFixed(1)} KB (${stats.totalInputTokens.toLocaleString()} tokens)`,
       `Output: ${(stats.totalOutputBytes / 1024).toFixed(1)} KB (${stats.totalOutputTokens.toLocaleString()} tokens)`,
       `Saved: ${(stats.bytesSaved / 1024).toFixed(1)} KB (${stats.tokensSaved.toLocaleString()} tokens, ${stats.savingsRatio.toFixed(0)}%)`,

@@ -1,6 +1,4 @@
 import { executeCode, type ExecuteResult } from '../sandbox/executor.js';
-import { compress } from '../compression/strategies.js';
-import { statsTracker } from '../utils/stats-tracker.js';
 import { type Language, type ShellRuntime, isShellLanguage } from '../sandbox/runtimes.js';
 import { DEFAULT_CONFIG } from '../config/defaults.js';
 import { denyReason, evaluateCommand, extractShellCommands } from '../security/policy.js';
@@ -12,13 +10,6 @@ export interface ExecuteToolInput {
   timeout?: number;
   max_output_tokens?: number;
   shell_runtime?: ShellRuntime;
-}
-
-function maybeAppendFooter(rawOutput: string, compressedOutput: string, strategy: string): string {
-  if (!DEFAULT_CONFIG.stats.footerEnabled) {
-    return compressedOutput;
-  }
-  return compressedOutput + statsTracker.formatStatsFooter(rawOutput, compressedOutput, strategy);
 }
 
 function securityCheck(language: Language, code: string): string | null {
@@ -72,23 +63,5 @@ export async function executeTool(input: ExecuteToolInput): Promise<string> {
   if (result.exitCode !== 0 && !result.timedOut) {
     rawOutput += `\n[Exit code: ${result.exitCode}]`;
   }
-
-  const maxChars =
-    typeof input.max_output_tokens === 'number' &&
-    Number.isFinite(input.max_output_tokens) &&
-    input.max_output_tokens > 0
-      ? Math.floor(input.max_output_tokens * 4)
-      : DEFAULT_CONFIG.compression.maxOutputBytes;
-
-  const compressed = compress(rawOutput, {
-    intent: input.intent,
-    maxOutputChars: maxChars,
-  });
-
-  if (compressed.strategy !== 'as-is') {
-    statsTracker.record('execute', rawOutput, compressed.output, compressed.strategy);
-    return maybeAppendFooter(rawOutput, compressed.output, compressed.strategy);
-  }
-
-  return compressed.output;
+  return rawOutput;
 }

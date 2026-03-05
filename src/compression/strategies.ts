@@ -27,7 +27,6 @@ export interface CompressResult {
 }
 
 const DEFAULT_MAX_CHARS = 8000;
-const DEFAULT_THRESHOLD_CHARS = 5120; // ~5KB
 
 // ─── Content Type Detection ──────────────────────────────────────────────────
 
@@ -98,14 +97,6 @@ function resolveMaxOutputChars(maxOutputChars?: number): number {
   }
 
   return DEFAULT_MAX_CHARS;
-}
-
-function resolveThresholdChars(): number {
-  const configured = DEFAULT_CONFIG.compression.thresholdBytes;
-  if (Number.isFinite(configured) && configured > 0) {
-    return Math.floor(configured);
-  }
-  return DEFAULT_THRESHOLD_CHARS;
 }
 
 function looksLikeCsv(lines: string[]): boolean {
@@ -521,21 +512,7 @@ function genericTruncate(
 
 export function compress(text: string, options: CompressOptions = {}): CompressResult {
   const maxOutputChars = resolveMaxOutputChars(options.maxOutputChars);
-  const thresholdChars = resolveThresholdChars();
   const inputChars = text.length;
-  const shouldCompressForBudget = inputChars > maxOutputChars;
-
-  // Skip compression if below threshold
-  if (inputChars < thresholdChars && !options.intent && !shouldCompressForBudget) {
-    return {
-      output: text,
-      strategy: 'as-is',
-      contentType: 'generic',
-      inputChars,
-      outputChars: inputChars,
-      savedPercent: 0,
-    };
-  }
 
   const contentType = detectContentType(text);
   let strategy: CompressionStrategy = options.strategy ?? 'auto';

@@ -17,6 +17,7 @@ export interface IndexContentToolInput {
   source?: string;
   kb_name?: string;
   chunk_size?: number;
+  max_output_tokens?: number;
 }
 
 export async function indexContentTool(input: IndexContentToolInput): Promise<string> {

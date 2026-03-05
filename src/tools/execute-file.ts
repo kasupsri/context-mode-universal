@@ -1,6 +1,4 @@
 import { executeFile } from '../sandbox/executor.js';
-import { compress } from '../compression/strategies.js';
-import { statsTracker } from '../utils/stats-tracker.js';
 import { DEFAULT_CONFIG } from '../config/defaults.js';
 import {
   denyReason,
@@ -14,13 +12,7 @@ export interface ExecuteFileToolInput {
   code: string;
   intent?: string;
   timeout?: number;
-}
-
-function maybeAppendFooter(rawOutput: string, compressedOutput: string, strategy: string): string {
-  if (!DEFAULT_CONFIG.stats.footerEnabled) {
-    return compressedOutput;
-  }
-  return compressedOutput + statsTracker.formatStatsFooter(rawOutput, compressedOutput, strategy);
+  max_output_tokens?: number;
 }
 
 export async function executeFileTool(input: ExecuteFileToolInput): Promise<string> {
@@ -60,16 +52,5 @@ export async function executeFileTool(input: ExecuteFileToolInput): Promise<stri
   if (result.timedOut) {
     rawOutput = `[TIMEOUT after ${timeoutMs}ms]\n${rawOutput}`;
   }
-
-  const compressed = compress(rawOutput, {
-    intent: input.intent,
-    maxOutputChars: DEFAULT_CONFIG.compression.maxOutputBytes,
-  });
-
-  if (compressed.strategy !== 'as-is') {
-    statsTracker.record('execute_file', rawOutput, compressed.output, compressed.strategy);
-    return maybeAppendFooter(rawOutput, compressed.output, compressed.strategy);
-  }
-
-  return compressed.output;
+  return rawOutput;
 }

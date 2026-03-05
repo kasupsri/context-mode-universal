@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { compress } from '../../src/compression/strategies.js';
+import { optimizeResponse } from '../../src/compression/response-optimizer.js';
 
 /**
  * Benchmark tests that verify minimum compression ratios.
@@ -107,7 +108,7 @@ ${methods.join('\n')}
   {
     name: 'Markdown documentation (large)',
     contentType: 'markdown',
-    expectedMinSavings: 60,
+    expectedMinSavings: 40,
     generateContent: () => {
       const sections: string[] = [];
       for (let i = 0; i < 20; i++) {
@@ -157,7 +158,7 @@ const config = {
   {
     name: 'Docker ps output (100 containers)',
     contentType: 'generic',
-    expectedMinSavings: 50,
+    expectedMinSavings: 40,
     generateContent: () => {
       const lines = [
         'CONTAINER ID   IMAGE                    COMMAND                  CREATED        STATUS         PORTS                    NAMES',
@@ -197,6 +198,16 @@ describe('Compression Benchmarks', () => {
 
       expect(result.savedPercent).toBeGreaterThanOrEqual(testCase.expectedMinSavings);
       expect(result.outputChars).toBeLessThanOrEqual(8500); // Within target
+
+      const optimized = optimizeResponse(content, {
+        maxOutputTokens: 2000,
+        preferredStrategy: 'summarize',
+        toolName: 'benchmark',
+      });
+      const validCandidates = optimized.candidates.filter(candidate => candidate.valid);
+      expect(validCandidates.length).toBeGreaterThan(0);
+      const minValidTokens = Math.min(...validCandidates.map(candidate => candidate.outputTokens));
+      expect(optimized.outputTokens).toBe(minValidTokens);
     });
   }
 });

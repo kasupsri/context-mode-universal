@@ -1,6 +1,4 @@
-import { compress, type CompressionStrategy } from '../compression/strategies.js';
-import { statsTracker } from '../utils/stats-tracker.js';
-import { DEFAULT_CONFIG } from '../config/defaults.js';
+import { type CompressionStrategy } from '../compression/strategies.js';
 
 export interface CompressToolInput {
   content: string;
@@ -10,36 +8,5 @@ export interface CompressToolInput {
 }
 
 export function compressTool(input: CompressToolInput): string {
-  const maxChars =
-    typeof input.max_output_tokens === 'number' &&
-    Number.isFinite(input.max_output_tokens) &&
-    input.max_output_tokens > 0
-      ? Math.floor(input.max_output_tokens * 4)
-      : DEFAULT_CONFIG.compression.maxOutputBytes;
-
-  const result = compress(input.content, {
-    intent: input.intent,
-    strategy: input.strategy ?? 'auto',
-    maxOutputChars: maxChars,
-  });
-
-  if (result.strategy === 'as-is') {
-    return result.output;
-  }
-
-  statsTracker.record('compress', input.content, result.output, result.strategy);
-
-  if (!DEFAULT_CONFIG.stats.footerEnabled) {
-    return result.output;
-  }
-
-  const footer = [
-    '',
-    '---',
-    `[context-mode] ${result.contentType} content compressed: ` +
-      `${Math.round(result.inputChars / 1024)}KB → ${Math.round(result.outputChars / 1024)}KB ` +
-      `(${result.savedPercent}% saved, strategy: ${result.strategy})`,
-  ].join('\n');
-
-  return result.output + footer;
+  return input.content;
 }

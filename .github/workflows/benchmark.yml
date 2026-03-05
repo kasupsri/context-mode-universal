@@ -26,7 +26,7 @@ jobs:
         run: npm run build
 
       - name: Run benchmarks
-        run: npx vitest run tests/benchmarks/ --reporter=verbose
+        run: npm run test:benchmarks
 
       - name: Generate BENCHMARK.md
         run: npm run benchmark

@@ -2,9 +2,12 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createServer } from '../../src/server.js';
+import { join } from 'path';
 
 describe('MCP Protocol Compliance', () => {
   let client: Client;
+  const extractText = (result: { content?: unknown }): string =>
+    ((result.content as Array<{ type: string; text: string }>)[0]?.text ?? '') as string;
 
   beforeAll(async () => {
     const { server } = createServer();
@@ -46,6 +49,8 @@ describe('MCP Protocol Compliance', () => {
       expect(tool.inputSchema).toBeDefined();
       expect(tool.inputSchema.type).toBe('object');
       expect(tool.inputSchema.properties).toBeDefined();
+      expect(typeof tool.inputSchema.properties).toBe('object');
+      expect(tool.inputSchema.properties).toHaveProperty('max_output_tokens');
     }
   });
 
@@ -60,12 +65,12 @@ describe('MCP Protocol Compliance', () => {
 
     expect(result.isError).toBeFalsy();
     expect(result.content).toBeDefined();
-    const text = (result.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
+    const text = extractText(result);
     expect(text).toContain('MCP test passed');
   });
 
   it('compress tool reduces large content', async () => {
-    // Use a larger array to ensure compression kicks in (well above 5KB threshold)
+    // Use a larger array to ensure optimizer has meaningful work.
     const largeContent = JSON.stringify(
       Array.from({ length: 500 }, (_, i) => ({
         id: i,
@@ -81,7 +86,7 @@ describe('MCP Protocol Compliance', () => {
     });
 
     expect(result.isError).toBeFalsy();
-    const text = (result.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
+    const text = extractText(result);
     expect(text.length).toBeLessThan(largeContent.length);
   });
 
@@ -94,11 +99,11 @@ describe('MCP Protocol Compliance', () => {
     });
 
     const stats = await client.callTool({ name: 'stats_get', arguments: {} });
-    const statsText = (stats.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
+    const statsText = extractText(stats);
     expect(statsText).toContain('Session Stats');
 
     const reset = await client.callTool({ name: 'stats_reset', arguments: {} });
-    const resetText = (reset.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
+    const resetText = extractText(reset);
     expect(resetText).toContain('reset');
   });
 
@@ -123,7 +128,7 @@ describe('MCP Protocol Compliance', () => {
     });
 
     expect(searchResult.isError).toBeFalsy();
-    const text = (searchResult.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
+    const text = extractText(searchResult);
     expect(text).toMatch(/interface|contract|typescript/i);
   });
 
@@ -143,7 +148,7 @@ describe('MCP Protocol Compliance', () => {
     });
 
     expect(result.isError).toBe(true);
-    const text = (result.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
+    const text = extractText(result);
     expect(text).toContain('Missing required argument "code"');
   });
 
@@ -158,7 +163,7 @@ describe('MCP Protocol Compliance', () => {
     });
 
     expect(result.isError).toBe(true);
-    const text = (result.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
+    const text = extractText(result);
     expect(text).toContain('Invalid value for "shell_runtime"');
   });
 
@@ -173,7 +178,116 @@ describe('MCP Protocol Compliance', () => {
     });
 
     expect(result.isError).toBe(true);
-    const text = (result.content as Array<{ type: string; text: string }>)[0]?.text ?? '';
+    const text = extractText(result);
     expect(text).toContain('Unknown argument "unknown_option"');
+  });
+
+  it('all tools accept max_output_tokens and return budget-bounded output', async () => {
+    const smallBudgetTokens = 20;
+    const maxChars = smallBudgetTokens * 4;
+    const filePath = join(process.cwd(), 'README.md');
+
+    const cases: Array<{ name: string; arguments: Record<string, unknown> }> = [
+      {
+        name: 'execute',
+        arguments: {
+          language: 'javascript',
+          code: 'console.log("a".repeat(1000))',
+          max_output_tokens: smallBudgetTokens,
+        },
+      },
+      {
+        name: 'execute_file',
+        arguments: {
+          file_path: filePath,
+          code: 'console.log((process.env.FILE_CONTENT || "").slice(0, 4000))',
+          max_output_tokens: smallBudgetTokens,
+        },
+      },
+      {
+        name: 'index',
+        arguments: {
+          content: '# title\\n\\n' + 'word '.repeat(2000),
+          kb_name: `budget-kb-${Date.now()}`,
+          max_output_tokens: smallBudgetTokens,
+        },
+      },
+      {
+        name: 'search',
+        arguments: {
+          query: 'title',
+          max_output_tokens: smallBudgetTokens,
+        },
+      },
+      {
+        name: 'fetch_and_index',
+        arguments: {
+          url: 'https://',
+          max_output_tokens: smallBudgetTokens,
+        },
+      },
+      {
+        name: 'compress',
+        arguments: {
+          content: 'x'.repeat(5000),
+          strategy: 'summarize',
+          max_output_tokens: smallBudgetTokens,
+        },
+      },
+      {
+        name: 'proxy',
+        arguments: {
+          tool: 'unknown_tool',
+          args: {},
+          max_output_tokens: smallBudgetTokens,
+        },
+      },
+      {
+        name: 'stats_get',
+        arguments: {
+          max_output_tokens: smallBudgetTokens,
+        },
+      },
+      {
+        name: 'stats_reset',
+        arguments: {
+          max_output_tokens: smallBudgetTokens,
+        },
+      },
+      {
+        name: 'stats_export',
+        arguments: {
+          max_output_tokens: smallBudgetTokens,
+        },
+      },
+      {
+        name: 'doctor',
+        arguments: {
+          max_output_tokens: smallBudgetTokens,
+        },
+      },
+    ];
+
+    for (const t of cases) {
+      const result = await client.callTool({ name: t.name, arguments: t.arguments });
+      const text = extractText(result);
+      expect(text.length).toBeLessThanOrEqual(maxChars);
+    }
+  });
+
+  it('optimizes error responses under budget while preserving error marker', async () => {
+    const budgetTokens = 5;
+    const result = await client.callTool({
+      name: 'execute',
+      arguments: {
+        language: 'javascript',
+        max_output_tokens: budgetTokens,
+      },
+    });
+
+    expect(result.isError).toBe(true);
+    const text = extractText(result);
+    expect(text.length).toBeLessThanOrEqual(budgetTokens * 4);
+    expect(/error|stderr|exit code|timeout/i.test(text)).toBe(true);
   });
 });

@@ -8,6 +8,7 @@ export interface FetchAndIndexToolInput {
   url: string;
   kb_name?: string;
   chunk_size?: number;
+  max_output_tokens?: number;
 }
 
 function parseAndValidateUrl(raw: string): URL {

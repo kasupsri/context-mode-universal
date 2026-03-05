@@ -264,7 +264,9 @@ function filterLinesByIntent(text: string, queryTerms: string[], maxOutputChars:
     return text.length > maxOutputChars ? text.slice(0, maxOutputChars) : text;
   }
 
-  const resultLines = Array.from(lineIndices).sort((a, b) => a - b).map(i => lines[i] ?? '');
+  const resultLines = Array.from(lineIndices)
+    .sort((a, b) => a - b)
+    .map(i => lines[i] ?? '');
 
   const result = resultLines.join('\n');
   return result.length > maxOutputChars ? result.slice(0, maxOutputChars) : result;

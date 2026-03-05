@@ -15,6 +15,7 @@ Most context-management MCP servers are Linux-first. This project is built for W
 
 - Sandboxed execution with strict policy checks before runtime invocation.
 - Algorithmic output compression (no LLM/API dependency inside compression).
+- Global response optimization that selects the minimum-token valid output under budget.
 - Local BM25 knowledge base indexing and search.
 - Stats telemetry for bytes/tokens saved in the current session.
 - Diagnostics (`doctor`) to validate runtime resolution and policy behavior.
@@ -131,21 +132,40 @@ If `codex` CLI is not installed, `setup.ps1` automatically falls back to `%USERP
 
 - `execute`: Run code in a sandboxed subprocess with Windows-first shell resolution.
 - `execute_file`: Analyze/process file content in a sandboxed JavaScript runtime.
-- `compress`: Compress large text using content-aware strategies.
+- `compress`: Re-optimize arbitrary text using content-aware strategy hints.
 - `index`: Index markdown/text content into BM25 chunks.
 - `search`: Search indexed content.
 - `fetch_and_index`: Fetch a URL, convert to markdown/text, and index it.
-- `proxy`: Proxy common tool-like actions, then compress output.
+- `proxy`: Proxy common tool-like actions with always-optimized output.
 - `stats_get`: Show session compression savings.
 - `stats_reset`: Reset in-memory session stats.
 - `stats_export`: Export stats JSON (default `%TEMP%`).
 - `doctor`: Run local diagnostics for runtime and safety checks.
 
+All tools accept optional `max_output_tokens` to bound response size.
+
+## Measured Gains
+
+Measured on March 5, 2026 with deterministic samples comparing legacy response shaping vs the current global optimizer:
+
+| Sample | Legacy output tokens | New output tokens | Improvement |
+|---|---:|---:|---:|
+| git log (500 lines) | 647 | 619 | 4.3% |
+| app logs (1000 lines) | 296 | 267 | 9.8% |
+| markdown docs (15 sections) | 2077 | 2048 | 1.4% |
+| proxy guidance text | 56 | 9 | 83.9% |
+| **Total (sample set)** | **3110** | **2977** | **4.3%** |
+
+Additional enforced gains:
+
+- `max_output_tokens` coverage increased from `3/11` tools to `11/11`.
+- All success and error responses now pass through the same budgeted optimizer path.
+- Token-expensive inline compression footers were removed from normal tool responses.
+
 ## Environment Variables
 
 | Variable | Default | Notes |
 |---|---|---|
-| `WCM_THRESHOLD_BYTES` | `5120` | Minimum output size before compression is applied |
 | `WCM_MAX_OUTPUT_BYTES` | `8192` | Target max size of compressed output |
 | `WCM_TIMEOUT_MS` | `30000` | Default sandbox timeout |
 | `WCM_MEMORY_MB` | `256` | Max memory hint for Node runtime |
@@ -157,7 +177,6 @@ If `codex` CLI is not installed, `setup.ps1` automatically falls back to `%USERP
 | `WCM_DB_PATH` | OS temp path | SQLite DB path for indexed content |
 | `WCM_SEARCH_TOP_K` | `5` | Default search result count |
 | `WCM_MAX_FETCH_BYTES` | `5242880` | Max fetch size for `fetch_and_index` |
-| `WCM_STATS_FOOTER` | `true` | Set to `false` to hide stats footer |
 | `WCM_STATS_EXPORT_PATH` | unset | Default export path override |
 | `WCM_STATS_MAX_EVENTS` | `1000` | Max in-memory compression events retained |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
@@ -185,7 +204,7 @@ npm run benchmark
 
 Additional docs:
 
-- [howitworks.md](./howitworks.md)
+- [HOW_IT_WORKS.md](./HOW_IT_WORKS.md)
 - [CONTRIBUTING.md](./CONTRIBUTING.md)
 - [BENCHMARK.md](./BENCHMARK.md)
 

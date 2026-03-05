@@ -6,6 +6,7 @@ export interface SearchToolInput {
   query: string;
   kb_name?: string;
   top_k?: number;
+  max_output_tokens?: number;
 }
 
 export async function searchTool(input: SearchToolInput): Promise<string> {
