@@ -16,46 +16,14 @@ const MCP_CONFIG = (pkg: string) =>
     2
   );
 
-const CASCADE_RULES = `# Context Mode Rules for Windsurf Cascade
+const CASCADE_RULES = `# Context Mode Rules
 
-## Purpose
-Route tool outputs through context-mode for minimum-token responses.
-
-## When to Use Context-Mode Tools
-
-Use \`context-mode.execute\` instead of direct shell commands for:
-- \`git log\`, \`git diff --stat\`, \`git show\`
-- \`npm list\`, \`pip list\`, \`cargo tree\`
-- \`cat\` of files > 200 lines
-- \`find\` with large result sets
-- Test suite runners producing > 50 lines
-
-Use \`context-mode.fetch_and_index\` + \`context-mode.search\` instead of reading documentation URLs directly.
-
-Use \`context-mode.compress\` for any text you already have.
-Use \`max_output_tokens\` on tool calls to enforce strict response budgets.
-
-## Examples
-
-\`\`\`javascript
-// Large git history
-execute({ language: "shell", code: "git log --oneline -100", intent: "find commits related to authentication", max_output_tokens: 900 })
-
-// Large file analysis
-execute_file({
-  file_path: "/path/to/large.json",
-  code: \`const d = JSON.parse(process.env.FILE_CONTENT);
-console.log('Keys:', Object.keys(d).join(', '));
-console.log('Size:', JSON.stringify(d).length, 'chars');\`
-})
-
-// Documentation lookup
-fetch_and_index({ url: "https://docs.example.com/api", kb_name: "docs" })
-search({ query: "authentication endpoint", kb_name: "docs" })
-\`\`\`
-
-## Stats
-Run \`execute({ language: "javascript", code: "/* session stats via context-mode */" })\` to see compression stats.
+Use context-mode tools for shell/files/docs/large output.
+Defaults:
+- response_mode: "minimal"
+- max_output_tokens: 400
+- search with compact output
+Use response_mode: "full" only on demand.
 `;
 
 export class WindsurfAdapter implements BaseAdapter {

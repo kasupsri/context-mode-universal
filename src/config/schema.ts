@@ -19,6 +19,10 @@ const SHELL_RUNTIMES: ReadonlySet<ContextModeConfig['sandbox']['shellDefault']> 
   'zsh',
   'sh',
 ]);
+const RESPONSE_MODES: ReadonlySet<ContextModeConfig['compression']['responseMode']> = new Set([
+  'minimal',
+  'full',
+]);
 
 function asObject(input: unknown): Record<string, unknown> | null {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -82,6 +86,26 @@ export function loadConfigFromEnv(): DeepPartial<ContextModeConfig> {
   if (maxOutputBytes !== undefined) {
     config.compression = config.compression ?? {};
     config.compression.maxOutputBytes = maxOutputBytes;
+  }
+
+  const defaultMaxOutputTokens = parsePositiveInt(process.env['CMU_DEFAULT_MAX_OUTPUT_TOKENS']);
+  if (defaultMaxOutputTokens !== undefined) {
+    config.compression = config.compression ?? {};
+    config.compression.defaultMaxOutputTokens = defaultMaxOutputTokens;
+  }
+
+  const hardMaxOutputTokens = parsePositiveInt(process.env['CMU_HARD_MAX_OUTPUT_TOKENS']);
+  if (hardMaxOutputTokens !== undefined) {
+    config.compression = config.compression ?? {};
+    config.compression.hardMaxOutputTokens = hardMaxOutputTokens;
+  }
+
+  if (process.env['CMU_RESPONSE_MODE']) {
+    const mode = process.env['CMU_RESPONSE_MODE'];
+    if (mode && RESPONSE_MODES.has(mode as ContextModeConfig['compression']['responseMode'])) {
+      config.compression = config.compression ?? {};
+      config.compression.responseMode = mode as ContextModeConfig['compression']['responseMode'];
+    }
   }
 
   const timeoutMs = parsePositiveInt(process.env['CMU_TIMEOUT_MS']);

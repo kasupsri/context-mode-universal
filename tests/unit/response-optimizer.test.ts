@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { optimizeResponse } from '../../src/compression/response-optimizer.js';
+import { DEFAULT_CONFIG } from '../../src/config/defaults.js';
 
 function minValidTokens(result: ReturnType<typeof optimizeResponse>): number {
   const valid = result.candidates.filter(candidate => candidate.valid);
@@ -24,7 +25,7 @@ describe('optimizeResponse', () => {
     const text = 'abcdefghijklmnopqrstuvwxyz'.repeat(200);
     const result = optimizeResponse(text, { maxOutputTokens: 40, toolName: 'search' });
 
-    expect(result.output.length).toBeLessThanOrEqual(160);
+    expect(result.output.length).toBeLessThanOrEqual(120);
     expect(result.budgetForced).toBe(true);
   });
 
@@ -45,7 +46,26 @@ describe('optimizeResponse', () => {
       isError: true,
     });
 
-    expect(result.output.length).toBeLessThanOrEqual(16);
+    expect(result.output.length).toBeLessThanOrEqual(12);
     expect(/error|stderr|exit code|timeout/i.test(result.output)).toBe(true);
+  });
+
+  it('applies default token budget when maxOutputTokens is omitted', () => {
+    const text = 'x'.repeat(10000);
+    const result = optimizeResponse(text, { toolName: 'execute' });
+
+    expect(result.budgetTokens).toBe(DEFAULT_CONFIG.compression.defaultMaxOutputTokens);
+    expect(result.outputTokens).toBeLessThanOrEqual(result.budgetTokens);
+  });
+
+  it('enforces hard max token cap when request exceeds limit', () => {
+    const text = 'x'.repeat(20000);
+    const result = optimizeResponse(text, {
+      toolName: 'execute',
+      maxOutputTokens: DEFAULT_CONFIG.compression.hardMaxOutputTokens + 500,
+    });
+
+    expect(result.budgetTokens).toBe(DEFAULT_CONFIG.compression.hardMaxOutputTokens);
+    expect(result.outputTokens).toBeLessThanOrEqual(result.budgetTokens);
   });
 });

@@ -14,6 +14,10 @@ export interface SearchResponse {
   kbName: string;
 }
 
+export interface FormatSearchOptions {
+  compact?: boolean;
+}
+
 export class Searcher {
   constructor(private store: SqliteStore) {}
 
@@ -45,13 +49,27 @@ export class Searcher {
     return { results: finalResults, query, totalFound: finalResults.length, kbName };
   }
 
-  formatResults(response: SearchResponse): string {
+  formatResults(response: SearchResponse, options: FormatSearchOptions = {}): string {
+    const compact = options.compact ?? true;
     if (response.results.length === 0) {
-      return `No results found for "${response.query}" in knowledge base "${response.kbName}".`;
+      return compact
+        ? `search none q="${response.query}" kb=${response.kbName}`
+        : `No results found for "${response.query}" in knowledge base "${response.kbName}".`;
+    }
+
+    if (compact) {
+      const lines: string[] = [`search n=${response.totalFound} q="${response.query}" kb=${response.kbName}`];
+      for (let i = 0; i < response.results.length; i++) {
+        const r = response.results[i]!;
+        const heading = r.heading ? ` h=${r.heading}` : '';
+        lines.push(
+          `${i + 1}. s=${r.score.toFixed(2)} src=${r.source}${heading}\n${r.snippet.slice(0, 140)}`
+        );
+      }
+      return lines.join('\n');
     }
 
     const lines: string[] = [`Found ${response.totalFound} result(s) for "${response.query}":`, ''];
-
     for (let i = 0; i < response.results.length; i++) {
       const r = response.results[i]!;
       lines.push(`### Result ${i + 1} (score: ${r.score.toFixed(3)})`);

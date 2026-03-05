@@ -7,6 +7,9 @@ const ENV_KEYS = [
   'CMU_MAX_FILE_BYTES',
   'CMU_ALLOW_AUTH_PASSTHROUGH',
   'CMU_MAX_FETCH_BYTES',
+  'CMU_DEFAULT_MAX_OUTPUT_TOKENS',
+  'CMU_HARD_MAX_OUTPUT_TOKENS',
+  'CMU_RESPONSE_MODE',
   'CMU_SHELL',
   'LOG_LEVEL',
 ] as const;
@@ -32,6 +35,9 @@ describe('config schema', () => {
     process.env['CMU_MAX_FILE_BYTES'] = '2048';
     process.env['CMU_ALLOW_AUTH_PASSTHROUGH'] = 'true';
     process.env['CMU_MAX_FETCH_BYTES'] = '1048576';
+    process.env['CMU_DEFAULT_MAX_OUTPUT_TOKENS'] = '500';
+    process.env['CMU_HARD_MAX_OUTPUT_TOKENS'] = '900';
+    process.env['CMU_RESPONSE_MODE'] = 'minimal';
     process.env['CMU_SHELL'] = 'auto';
     process.env['LOG_LEVEL'] = 'warn';
 
@@ -41,6 +47,9 @@ describe('config schema', () => {
     expect(cfg.sandbox?.maxFileBytes).toBe(2048);
     expect(cfg.sandbox?.allowAuthPassthrough).toBe(true);
     expect(cfg.sandbox?.shellDefault).toBe('auto');
+    expect(cfg.compression?.defaultMaxOutputTokens).toBe(500);
+    expect(cfg.compression?.hardMaxOutputTokens).toBe(900);
+    expect(cfg.compression?.responseMode).toBe('minimal');
     expect(cfg.knowledgeBase?.maxFetchBytes).toBe(1048576);
     expect(cfg.logging?.level).toBe('warn');
   });

@@ -90,6 +90,30 @@ describe('MCP Protocol Compliance', () => {
     expect(text.length).toBeLessThan(largeContent.length);
   });
 
+  it('supports response_mode full escape hatch', async () => {
+    const kbName = `full-kb-${Date.now()}`;
+    await client.callTool({
+      name: 'index',
+      arguments: {
+        content: '# Title\n\nalpha beta gamma',
+        kb_name: kbName,
+        response_mode: 'full',
+      },
+    });
+
+    const result = await client.callTool({
+      name: 'search',
+      arguments: {
+        query: 'alpha',
+        kb_name: kbName,
+        response_mode: 'full',
+      },
+    });
+
+    const text = extractText(result);
+    expect(text).toContain('Result');
+  });
+
   it('stats tools return and reset session data', async () => {
     await client.callTool({
       name: 'compress',
@@ -100,7 +124,7 @@ describe('MCP Protocol Compliance', () => {
 
     const stats = await client.callTool({ name: 'stats_get', arguments: {} });
     const statsText = extractText(stats);
-    expect(statsText).toContain('Session Stats');
+    expect(statsText).toContain('stats');
 
     const reset = await client.callTool({ name: 'stats_reset', arguments: {} });
     const resetText = extractText(reset);
@@ -184,7 +208,7 @@ describe('MCP Protocol Compliance', () => {
 
   it('all tools accept max_output_tokens and return budget-bounded output', async () => {
     const smallBudgetTokens = 20;
-    const maxChars = smallBudgetTokens * 4;
+    const maxChars = smallBudgetTokens * 3;
     const filePath = join(process.cwd(), 'README.md');
 
     const cases: Array<{ name: string; arguments: Record<string, unknown> }> = [
@@ -287,7 +311,7 @@ describe('MCP Protocol Compliance', () => {
 
     expect(result.isError).toBe(true);
     const text = extractText(result);
-    expect(text.length).toBeLessThanOrEqual(budgetTokens * 4);
+    expect(text.length).toBeLessThanOrEqual(budgetTokens * 3);
     expect(/error|stderr|exit code|timeout/i.test(text)).toBe(true);
   });
 });

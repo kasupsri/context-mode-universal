@@ -1,6 +1,7 @@
 import { Indexer } from '../knowledge-base/indexer.js';
 import { getStore } from './index-content.js';
 import { DEFAULT_CONFIG } from '../config/defaults.js';
+import { type ResponseMode } from '../config/defaults.js';
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
 
@@ -9,6 +10,7 @@ export interface FetchAndIndexToolInput {
   kb_name?: string;
   chunk_size?: number;
   max_output_tokens?: number;
+  response_mode?: ResponseMode;
 }
 
 function parseAndValidateUrl(raw: string): URL {
@@ -228,10 +230,15 @@ export async function fetchAndIndexTool(input: FetchAndIndexToolInput): Promise<
   const stats = await store.getStats(kb_name);
   const wordCount = markdown.split(/\s+/).length;
 
-  return [
-    `Fetched and indexed "${url}"`,
-    `Content: ~${wordCount.toLocaleString()} words converted to ${result.chunksIndexed} searchable chunks.`,
-    `Knowledge base "${kb_name}": ${stats.chunkCount} total chunks from ${stats.sources} source(s).`,
-    `Use search to query: search({ query: "your question", kb_name: "${kb_name}" })`,
-  ].join('\n');
+  const responseMode = input.response_mode ?? DEFAULT_CONFIG.compression.responseMode;
+  if (responseMode === 'full') {
+    return [
+      `Fetched and indexed "${url}"`,
+      `Content: ~${wordCount.toLocaleString()} words converted to ${result.chunksIndexed} searchable chunks.`,
+      `Knowledge base "${kb_name}": ${stats.chunkCount} total chunks from ${stats.sources} source(s).`,
+      `Use search to query: search({ query: "your question", kb_name: "${kb_name}" })`,
+    ].join('\n');
+  }
+
+  return `ok:fetch_index chunks=${result.chunksIndexed} words=${wordCount} kb=${kb_name} total=${stats.chunkCount} srcs=${stats.sources}`;
 }

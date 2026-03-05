@@ -193,6 +193,21 @@ class StatsTracker {
     return lines.join('\n');
   }
 
+  formatSessionStatsMinimal(): string {
+    const stats = this.getSessionStats();
+    return [
+      'stats',
+      `events=${stats.totalEvents}`,
+      `changed=${stats.responsesChanged}`,
+      `budget=${stats.budgetForced}`,
+      `in_tok=${stats.totalInputTokens}`,
+      `out_tok=${stats.totalOutputTokens}`,
+      `saved_tok=${stats.tokensSaved}`,
+      `saved_pct=${stats.savingsRatio.toFixed(0)}`,
+      `dropped=${stats.droppedEvents}`,
+    ].join(' ');
+  }
+
   async exportToFile(path?: string): Promise<string> {
     const targetPath =
       path ?? join(tmpdir(), `wcm-stats-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);

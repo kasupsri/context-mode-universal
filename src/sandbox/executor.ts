@@ -33,7 +33,7 @@ export interface ExecuteResult {
   durationMs: number;
 }
 
-const HARD_OUTPUT_CAP_BYTES = 10 * 1024 * 1024; // 10MB
+const HARD_OUTPUT_CAP_BYTES = 2 * 1024 * 1024; // 2MB
 
 function killProcessTree(pid: number): void {
   if (process.platform === 'win32') {

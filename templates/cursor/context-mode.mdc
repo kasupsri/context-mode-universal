@@ -1,40 +1,11 @@
 ---
-description: Route all tool outputs through context-mode for minimum-token responses
+description: Use context-mode for compact output
 globs: ["**/*"]
 alwaysApply: true
 ---
 
-## Context Preservation Rules
-
-Use the `context-mode` MCP tools for all substantial tool interactions:
-
-- Instead of running shell commands directly, use `context-mode.execute` with `language: "shell"`
-- Instead of reading large files, use `context-mode.execute_file`
-- When fetching documentation, use `context-mode.fetch_and_index` + `context-mode.search`
-- For any tool output, you can pass `max_output_tokens` to enforce strict response budget
-
-### Commands with high optimization impact
-- `git log`, `git diff`, `cat` large files, `find`, reading log files
-- `npm list`, `pip list`, dependency audits, `yarn why`
-- API responses, test suite output (>100 tests)
-- Browser snapshots, web page content, database dumps
-
-### Example usage
-
-```
-// Instead of: bash("git log --oneline -50")
-execute({ language: "shell", code: "git log --oneline -50", intent: "recent changes", max_output_tokens: 800 })
-
-// Instead of: read_file("package-lock.json")
-execute_file({
-  file_path: "package-lock.json",
-  code: "const d=JSON.parse(process.env.FILE_CONTENT); console.log('Packages:', Object.keys(d.dependencies||{}).length)"
-})
-
-// Compress any large text
-compress({ content: largeOutput, intent: "find error messages", max_output_tokens: 600 })
-
-// Fetch and index docs
-fetch_and_index({ url: "https://docs.example.com" })
-search({ query: "what I need to know" })
-```
+Use context-mode tools for shell, large files, docs, and long output.
+Default to:
+- response_mode: "minimal"
+- max_output_tokens: 400
+- compact search output

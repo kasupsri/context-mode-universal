@@ -21,6 +21,7 @@ import { logger } from './utils/logger.js';
 import { optimizeResponse } from './compression/response-optimizer.js';
 import { statsTracker } from './utils/stats-tracker.js';
 import { type CompressionStrategy } from './compression/strategies.js';
+import { DEFAULT_CONFIG, type ResponseMode } from './config/defaults.js';
 
 const TOOLS: Tool[] = [
   {
@@ -134,7 +135,7 @@ const TOOLS: Tool[] = [
       properties: {
         content: { type: 'string' },
         intent: { type: 'string' },
-        strategy: { type: 'string', enum: ['auto', 'truncate', 'summarize', 'filter'] },
+        strategy: { type: 'string', enum: ['auto', 'truncate', 'summarize', 'filter', 'ultra'] },
         max_output_tokens: { type: 'number' },
       },
       required: ['content'],
@@ -149,7 +150,7 @@ const TOOLS: Tool[] = [
         tool: { type: 'string' },
         args: { type: 'object' },
         intent: { type: 'string' },
-        strategy: { type: 'string', enum: ['auto', 'truncate', 'summarize', 'filter'] },
+        strategy: { type: 'string', enum: ['auto', 'truncate', 'summarize', 'filter', 'ultra'] },
         max_output_tokens: { type: 'number' },
       },
       required: ['tool', 'args'],
@@ -208,6 +209,21 @@ interface ToolSchema {
   required?: string[];
 }
 
+const RESPONSE_MODES: ReadonlySet<ResponseMode> = new Set(['minimal', 'full']);
+
+for (const tool of TOOLS) {
+  const schema = tool.inputSchema as ToolSchema;
+  schema.properties = schema.properties ?? {};
+  schema.properties['max_output_tokens'] = schema.properties['max_output_tokens'] ?? { type: 'number' };
+  schema.properties['response_mode'] = {
+    type: 'string',
+    enum: ['minimal', 'full'],
+  };
+  if (tool.name === 'search') {
+    schema.properties['compact'] = { type: 'boolean' };
+  }
+}
+
 const TOOL_BY_NAME = new Map(TOOLS.map(tool => [tool.name, tool]));
 
 const OPTIMIZATION_STRATEGIES: ReadonlySet<CompressionStrategy> = new Set([
@@ -215,7 +231,17 @@ const OPTIMIZATION_STRATEGIES: ReadonlySet<CompressionStrategy> = new Set([
   'truncate',
   'summarize',
   'filter',
+  'ultra',
   'as-is',
+]);
+const ULTRA_FIRST_TOOLS = new Set([
+  'search',
+  'index',
+  'fetch_and_index',
+  'doctor',
+  'stats_get',
+  'stats_reset',
+  'stats_export',
 ]);
 
 function asObject(input: unknown): Record<string, unknown> {
@@ -225,28 +251,48 @@ function asObject(input: unknown): Record<string, unknown> {
   return input as Record<string, unknown>;
 }
 
+function resolveRequestedMaxOutputTokens(rawValue: unknown): number {
+  const configuredDefault = DEFAULT_CONFIG.compression.defaultMaxOutputTokens;
+  const configuredHard = DEFAULT_CONFIG.compression.hardMaxOutputTokens;
+  const defaultTokens =
+    Number.isFinite(configuredDefault) && configuredDefault > 0 ? Math.floor(configuredDefault) : 400;
+  const hardCap =
+    Number.isFinite(configuredHard) && configuredHard > 0 ? Math.floor(configuredHard) : 800;
+  const requested =
+    typeof rawValue === 'number' && Number.isFinite(rawValue) && rawValue > 0
+      ? Math.floor(rawValue)
+      : defaultTokens;
+  return Math.max(1, Math.min(requested, hardCap));
+}
+
+function resolveResponseMode(rawValue: unknown): ResponseMode {
+  if (typeof rawValue === 'string' && RESPONSE_MODES.has(rawValue as ResponseMode)) {
+    return rawValue as ResponseMode;
+  }
+  return DEFAULT_CONFIG.compression.responseMode;
+}
+
 function getOptimizationHints(args: unknown): {
   intent?: string;
-  maxOutputTokens?: number;
+  maxOutputTokens: number;
   preferredStrategy?: CompressionStrategy;
+  responseMode: ResponseMode;
 } {
   const parsed = asObject(args);
   const rawIntent = parsed['intent'];
-  const rawMax = parsed['max_output_tokens'];
   const rawStrategy = parsed['strategy'];
+  const rawMode = parsed['response_mode'];
 
   const intent = typeof rawIntent === 'string' && rawIntent.trim() ? rawIntent : undefined;
-  const maxOutputTokens =
-    typeof rawMax === 'number' && Number.isFinite(rawMax) && rawMax > 0
-      ? Math.floor(rawMax)
-      : undefined;
+  const maxOutputTokens = resolveRequestedMaxOutputTokens(parsed['max_output_tokens']);
   const preferredStrategy =
     typeof rawStrategy === 'string' &&
     OPTIMIZATION_STRATEGIES.has(rawStrategy as CompressionStrategy)
       ? (rawStrategy as CompressionStrategy)
       : undefined;
+  const responseMode = resolveResponseMode(rawMode);
 
-  return { intent, maxOutputTokens, preferredStrategy };
+  return { intent, maxOutputTokens, preferredStrategy, responseMode };
 }
 
 function shouldRecordStats(toolName: string): boolean {
@@ -298,6 +344,10 @@ function validateToolArguments(tool: Tool, args: unknown): string | null {
       return `Invalid argument type for "${key}" in tool "${tool.name}": expected number`;
     }
 
+    if (property.type === 'boolean' && typeof value !== 'boolean') {
+      return `Invalid argument type for "${key}" in tool "${tool.name}": expected boolean`;
+    }
+
     if (
       property.type === 'object' &&
       (typeof value !== 'object' || value === null || Array.isArray(value))
@@ -341,6 +391,9 @@ export function createServer(): { server: Server; transport: StdioServerTranspor
     logger.debug('Tool called', { name, args });
     const toolName = typeof name === 'string' ? name : 'unknown';
     const hints = getOptimizationHints(args);
+    const preferredStrategy =
+      hints.preferredStrategy ??
+      (hints.responseMode === 'minimal' && ULTRA_FIRST_TOOLS.has(toolName) ? 'ultra' : undefined);
 
     try {
       const tool = TOOL_BY_NAME.get(toolName);
@@ -397,7 +450,8 @@ export function createServer(): { server: Server; transport: StdioServerTranspor
       const optimized = optimizeResponse(result, {
         intent: hints.intent,
         maxOutputTokens: hints.maxOutputTokens,
-        preferredStrategy: hints.preferredStrategy,
+        preferredStrategy,
+        responseMode: hints.responseMode,
         toolName,
         isError: false,
       });
@@ -425,7 +479,8 @@ export function createServer(): { server: Server; transport: StdioServerTranspor
       const optimized = optimizeResponse(rawErrorText, {
         intent: hints.intent,
         maxOutputTokens: hints.maxOutputTokens,
-        preferredStrategy: hints.preferredStrategy,
+        preferredStrategy,
+        responseMode: hints.responseMode,
         toolName,
         isError: true,
       });

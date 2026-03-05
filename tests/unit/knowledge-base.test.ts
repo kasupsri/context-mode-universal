@@ -183,9 +183,17 @@ Public, private, and protected modifiers control visibility.
     expect(response.results.length).toBeGreaterThan(0);
   });
 
-  it('formats results as readable text', async () => {
+  it('formats results as compact text by default', async () => {
     const response = await searcher.search('classes inheritance');
     const formatted = searcher.formatResults(response);
+
+    expect(formatted).toContain('search n=');
+    expect(formatted).toContain('src=');
+  });
+
+  it('supports full response mode when requested', async () => {
+    const response = await searcher.search('classes inheritance');
+    const formatted = searcher.formatResults(response, { compact: false });
 
     expect(formatted).toContain('Result');
     expect(formatted).toContain('Source');

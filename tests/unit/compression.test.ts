@@ -58,7 +58,7 @@ describe('compress', () => {
   it('keeps small content exact while still using a strategy', () => {
     const small = 'Hello world';
     const result = compress(small);
-    expect(result.strategy).toBe('summarize');
+    expect(result.strategy).toBe('ultra');
     expect(result.output).toBe(small);
   });
 
@@ -85,7 +85,7 @@ describe('compress', () => {
     const json = JSON.stringify(arr);
 
     const result = compress(json, { maxOutputChars: 2000 });
-    expect(result.output).toContain('Array');
+    expect(result.output).toContain('json:a');
     expect(result.output).toContain('200');
     expect(result.outputChars).toBeLessThanOrEqual(2000);
   });
@@ -185,5 +185,19 @@ Log all exceptions.
     const result = compress(bigText, { strategy: 'truncate', maxOutputChars: 5000 });
     expect(result.savedPercent).toBeGreaterThan(80);
     expect(result.inputChars).toBe(50000);
+  });
+
+  it('supports ultra strategy for major content types', () => {
+    const json = JSON.stringify([{ id: 1, name: 'a' }, { id: 2, name: 'b' }]);
+    const log = '2026-01-01 INFO ok\n2026-01-01 ERROR boom';
+    const markdown = '# A\n\nLine one\n\n## B\n\nLine two';
+    const csv = 'a,b\n1,2\n3,4';
+    const generic = 'line\n'.repeat(50);
+
+    expect(compress(json, { strategy: 'ultra' }).output).toContain('json:');
+    expect(compress(log, { strategy: 'ultra' }).output).toContain('log');
+    expect(compress(markdown, { strategy: 'ultra' }).output).toContain('# A');
+    expect(compress(csv, { strategy: 'ultra' }).output).toContain('csv');
+    expect(compress(generic, { strategy: 'ultra' }).output.length).toBeLessThan(generic.length);
   });
 });

@@ -95,7 +95,8 @@ bash ./setup.sh
 - `stats_export`: Export stats JSON to disk.
 - `doctor`: Run runtime and safety diagnostics.
 
-All tools accept optional `max_output_tokens`.
+All tools accept optional `max_output_tokens` and `response_mode` (`minimal` or `full`).
+`search` also accepts optional `compact` (defaults to compact output in minimal mode).
 
 ## Shell Runtime Resolution
 
@@ -122,6 +123,9 @@ You can override with `shell_runtime`:
 | Variable | Default | Notes |
 |---|---|---|
 | `CMU_MAX_OUTPUT_BYTES` | `8192` | Target max compressed output bytes |
+| `CMU_DEFAULT_MAX_OUTPUT_TOKENS` | `400` | Default budget when request omits `max_output_tokens` |
+| `CMU_HARD_MAX_OUTPUT_TOKENS` | `800` | Hard upper token cap even if caller requests more |
+| `CMU_RESPONSE_MODE` | `minimal` | Global default for `response_mode` (`minimal` or `full`) |
 | `CMU_TIMEOUT_MS` | `30000` | Sandbox timeout |
 | `CMU_MEMORY_MB` | `256` | Node runtime memory hint |
 | `CMU_MAX_FILE_BYTES` | `1048576` | Max size for `execute_file` / `proxy(read_file)` |
@@ -130,7 +134,7 @@ You can override with `shell_runtime`:
 | `CMU_POLICY_MODE` | `strict` | `strict`, `balanced`, `permissive` |
 | `CMU_ALLOW_PRIVATE_NETWORK_FETCH` | `false` | Allow localhost/private network fetches |
 | `CMU_DB_PATH` | OS temp path | SQLite DB path |
-| `CMU_SEARCH_TOP_K` | `5` | Default search results |
+| `CMU_SEARCH_TOP_K` | `3` | Default search results |
 | `CMU_MAX_FETCH_BYTES` | `5242880` | Max bytes for `fetch_and_index` |
 | `CMU_STATS_EXPORT_PATH` | unset | Default `stats_export` output path override |
 | `CMU_STATS_MAX_EVENTS` | `1000` | Max retained in-memory optimization events |

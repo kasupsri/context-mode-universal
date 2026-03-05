@@ -1,9 +1,14 @@
+export type ResponseMode = 'minimal' | 'full';
+
 export interface ContextModeConfig {
   compression: {
     maxOutputBytes: number; // Target max output size
-    defaultStrategy: 'auto' | 'truncate' | 'summarize' | 'filter';
+    defaultStrategy: 'auto' | 'truncate' | 'summarize' | 'filter' | 'ultra';
     headLines: number; // Lines to keep from start (generic truncate)
     tailLines: number; // Lines to keep from end (generic truncate)
+    defaultMaxOutputTokens: number;
+    hardMaxOutputTokens: number;
+    responseMode: ResponseMode;
   };
   sandbox: {
     timeoutMs: number;
@@ -39,9 +44,12 @@ import { join } from 'path';
 export const DEFAULT_CONFIG: ContextModeConfig = {
   compression: {
     maxOutputBytes: 8 * 1024, // 8KB target output
-    defaultStrategy: 'auto',
+    defaultStrategy: 'ultra',
     headLines: 50,
     tailLines: 20,
+    defaultMaxOutputTokens: 400,
+    hardMaxOutputTokens: 800,
+    responseMode: 'minimal',
   },
   sandbox: {
     timeoutMs: 30_000,
@@ -59,7 +67,7 @@ export const DEFAULT_CONFIG: ContextModeConfig = {
     dbPath: join(tmpdir(), 'context-mode-universal.db'),
     maxChunkSize: 1500,
     chunkOverlap: 100,
-    searchTopK: 5,
+    searchTopK: 3,
     maxFetchBytes: 5 * 1024 * 1024, // 5MB
   },
   logging: {

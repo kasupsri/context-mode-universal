@@ -7,7 +7,7 @@ import { filterByIntent } from './intent-filter.js';
 import { DEFAULT_CONFIG } from '../config/defaults.js';
 
 export type ContentType = 'json' | 'log' | 'code' | 'markdown' | 'csv' | 'generic';
-export type CompressionStrategy = 'auto' | 'truncate' | 'summarize' | 'filter' | 'as-is';
+export type CompressionStrategy = 'auto' | 'truncate' | 'summarize' | 'filter' | 'ultra' | 'as-is';
 
 export interface CompressOptions {
   intent?: string;
@@ -15,6 +15,7 @@ export interface CompressOptions {
   headLines?: number;
   tailLines?: number;
   strategy?: CompressionStrategy;
+  parsedJson?: unknown;
 }
 
 export interface CompressResult {
@@ -52,6 +53,32 @@ export function detectContentType(text: string): ContentType {
   if (looksLikeMarkdown(trimmed)) return 'markdown';
 
   return 'generic';
+}
+
+function detectContentTypeWithParsed(text: string, parsedJson?: unknown): ContentType {
+  if (parsedJson !== undefined) return 'json';
+  const trimmed = text.trimStart();
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    const firstLines = takeFirstLines(trimmed, 5);
+    if (looksLikeCsv(firstLines)) return 'csv';
+    if (looksLikeLog(firstLines)) return 'log';
+    if (looksLikeCode(trimmed)) return 'code';
+    if (looksLikeMarkdown(trimmed)) return 'markdown';
+    return 'generic';
+  }
+  return detectContentType(trimmed);
+}
+
+function tryParseJson(text: string): unknown | undefined {
+  const trimmed = text.trimStart();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) {
+    return undefined;
+  }
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return undefined;
+  }
 }
 
 function isValidJson(text: string): boolean {
@@ -137,15 +164,12 @@ function looksLikeMarkdown(text: string): boolean {
 
 // ─── Compression Strategies ──────────────────────────────────────────────────
 
-function compressJson(text: string, maxChars: number, intent?: string): string {
+function compressJson(text: string, maxChars: number, intent?: string, parsedJson?: unknown): string {
   if (intent) return filterByIntent(text, intent, maxChars);
 
-  try {
-    const parsed = JSON.parse(text) as unknown;
-    return summarizeJson(parsed, maxChars);
-  } catch {
-    return genericTruncate(text, maxChars, 50, 20);
-  }
+  const parsed = parsedJson ?? tryParseJson(text);
+  if (parsed === undefined) return genericTruncate(text, maxChars, 50, 20);
+  return summarizeJson(parsed, maxChars);
 }
 
 function summarizeJson(value: unknown, maxChars: number, depth = 0): string {
@@ -203,14 +227,18 @@ function compressLog(text: string, maxChars: number, intent?: string): string {
   const lines = text.split('\n');
   const totalLines = lines.length;
 
-  // Group similar log lines
+  // Bound memory and CPU for very large logs.
+  const MAX_TRACKED_PATTERNS = 300;
+  const MAX_ERRORS = 25;
+  const MAX_WARNINGS = 25;
+
   const patterns: Map<string, { count: number; example: string }> = new Map();
   const errors: string[] = [];
   const warnings: string[] = [];
-  const unique: string[] = [];
+  let droppedPatternTracking = 0;
 
   for (const line of lines) {
-    // Normalize timestamps and IDs for pattern matching
+    // Normalize timestamps and IDs for pattern matching.
     const normalized = line
       .replace(/\d{4}-\d{2}-\d{2}T?\d{2}:\d{2}:\d{2}(\.\d+)?Z?/g, '<TIMESTAMP>')
       .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '<UUID>')
@@ -219,55 +247,49 @@ function compressLog(text: string, maxChars: number, intent?: string): string {
     const existing = patterns.get(normalized);
     if (existing) {
       existing.count++;
-    } else {
+    } else if (patterns.size < MAX_TRACKED_PATTERNS) {
       patterns.set(normalized, { count: 1, example: line });
+    } else {
+      droppedPatternTracking++;
     }
 
     if (/\b(error|exception|fatal|panic|critical)\b/i.test(line)) {
-      errors.push(line.slice(0, 300));
+      if (errors.length < MAX_ERRORS) errors.push(line.slice(0, 220));
     } else if (/\b(warn|warning)\b/i.test(line)) {
-      warnings.push(line.slice(0, 200));
+      if (warnings.length < MAX_WARNINGS) warnings.push(line.slice(0, 180));
     }
   }
 
   const result: string[] = [`=== Log Summary: ${totalLines} lines ===`, ''];
 
   if (errors.length > 0) {
-    result.push(`ERRORS (${errors.length}):`);
+    result.push(`ERRORS(sample=${errors.length}):`);
     result.push(...errors.slice(0, 10).map(e => `  ${e}`));
-    if (errors.length > 10) result.push(`  ... and ${errors.length - 10} more errors`);
+    if (errors.length > 10) result.push(`  ...${errors.length - 10} more`);
     result.push('');
   }
 
   if (warnings.length > 0) {
-    result.push(`WARNINGS (${warnings.length}):`);
+    result.push(`WARN(sample=${warnings.length}):`);
     result.push(...warnings.slice(0, 5).map(w => `  ${w}`));
-    if (warnings.length > 5) result.push(`  ... and ${warnings.length - 5} more warnings`);
+    if (warnings.length > 5) result.push(`  ...${warnings.length - 5} more`);
     result.push('');
   }
 
-  // Show top repeated patterns
   const sorted = Array.from(patterns.entries())
     .sort((a, b) => b[1].count - a[1].count)
     .slice(0, 20);
 
-  result.push('TOP LOG PATTERNS:');
+  result.push('TOP PATTERNS:');
   for (const [, { count, example }] of sorted) {
     if (count > 1) {
-      result.push(`  [x${count}] ${example.slice(0, 150)}`);
+      result.push(`  [x${count}] ${example.slice(0, 120)}`);
     }
   }
 
-  // Show unique lines (low frequency)
-  for (const [, { count, example }] of sorted) {
-    if (count === 1) {
-      unique.push(example);
-    }
-  }
-  if (unique.length > 0) {
+  if (droppedPatternTracking > 0) {
     result.push('');
-    result.push(`UNIQUE LINES (${unique.length}):`);
-    result.push(...unique.slice(0, 20).map(l => `  ${l.slice(0, 150)}`));
+    result.push(`...${droppedPatternTracking} pattern(s) not tracked`);
   }
 
   return clampToMaxChars(result.join('\n'), maxChars);
@@ -408,7 +430,8 @@ function compressCsv(text: string, maxChars: number, intent?: string): string {
   const header = lines[0] ?? '';
   const columns = header.split(delimiter);
   const dataRows = lines.slice(1);
-  const totalRows = dataRows.length;
+  const parsedRows = dataRows.map(row => row.split(delimiter));
+  const totalRows = parsedRows.length;
 
   const result: string[] = [
     `=== CSV: ${columns.length} columns × ${totalRows + 1} rows ===`,
@@ -428,7 +451,7 @@ function compressCsv(text: string, maxChars: number, intent?: string): string {
   }
 
   // Basic stats for numeric columns
-  const numericStats = computeCsvStats(dataRows, columns, delimiter);
+  const numericStats = computeCsvStats(parsedRows, columns);
   if (numericStats.length > 0) {
     result.push('');
     result.push('Numeric column stats:');
@@ -441,37 +464,212 @@ function compressCsv(text: string, maxChars: number, intent?: string): string {
 }
 
 function computeCsvStats(
-  rows: string[],
-  columns: string[],
-  delimiter: string
+  rows: string[][],
+  columns: string[]
 ): Array<{ column: string; min: number; max: number; avg: number }> {
   const stats: Array<{ column: string; min: number; max: number; avg: number }> = [];
+  const totals = columns.map(() => ({
+    count: 0,
+    min: Number.POSITIVE_INFINITY,
+    max: Number.NEGATIVE_INFINITY,
+    sum: 0,
+  }));
 
-  for (let colIdx = 0; colIdx < columns.length; colIdx++) {
-    let count = 0;
-    let min = Number.POSITIVE_INFINITY;
-    let max = Number.NEGATIVE_INFINITY;
-    let sum = 0;
+  for (const row of rows) {
+    for (let colIdx = 0; colIdx < columns.length; colIdx++) {
+      const cell = row[colIdx]?.trim() ?? '';
+      const num = Number.parseFloat(cell);
+      if (Number.isNaN(num)) continue;
 
-    for (const row of rows) {
-      const cells = row.split(delimiter);
-      const cell = cells[colIdx]?.trim() ?? '';
-      const num = parseFloat(cell);
-      if (!isNaN(num)) {
-        count++;
-        sum += num;
-        if (num < min) min = num;
-        if (num > max) max = num;
-      }
-    }
-
-    if (count > rows.length * 0.5) {
-      // mostly numeric
-      const avg = count > 0 ? sum / count : 0;
-      stats.push({ column: columns[colIdx] ?? `col${colIdx}`, min, max, avg });
+      const total = totals[colIdx]!;
+      total.count++;
+      total.sum += num;
+      if (num < total.min) total.min = num;
+      if (num > total.max) total.max = num;
     }
   }
+
+  for (let colIdx = 0; colIdx < columns.length; colIdx++) {
+    const total = totals[colIdx]!;
+    if (total.count <= rows.length * 0.5) continue;
+    stats.push({
+      column: columns[colIdx] ?? `col${colIdx}`,
+      min: total.min,
+      max: total.max,
+      avg: total.sum / Math.max(total.count, 1),
+    });
+  }
+
   return stats;
+}
+
+function compressUltra(
+  text: string,
+  contentType: ContentType,
+  maxChars: number,
+  parsedJson?: unknown
+): string {
+  switch (contentType) {
+    case 'json':
+      return ultraJson(text, maxChars, parsedJson);
+    case 'log':
+      return ultraLog(text, maxChars);
+    case 'markdown':
+      return ultraMarkdown(text, maxChars);
+    case 'csv':
+      return ultraCsv(text, maxChars);
+    case 'code':
+      return ultraCode(text, maxChars);
+    default:
+      return ultraGeneric(text, maxChars);
+  }
+}
+
+function ultraJson(text: string, maxChars: number, parsedJson?: unknown): string {
+  const parsed = parsedJson ?? tryParseJson(text);
+  if (parsed === undefined) return ultraGeneric(text, maxChars);
+
+  if (Array.isArray(parsed)) {
+    const parsedArray = parsed as unknown[];
+    const first = parsedArray[0];
+    const second = parsedArray[1];
+    const keys =
+      first && typeof first === 'object' && !Array.isArray(first)
+        ? Object.keys(first as object).slice(0, 8).join(',')
+        : '';
+    const lines = [
+      `json:a n=${parsedArray.length} t=${getJsonType(first)}`,
+      keys ? `keys:${keys}` : '',
+      first !== undefined ? `s1:${JSON.stringify(first).slice(0, 120)}` : '',
+      second !== undefined ? `s2:${JSON.stringify(second).slice(0, 120)}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+    return clampToMaxChars(lines, maxChars);
+  }
+
+  if (parsed && typeof parsed === 'object') {
+    const obj = parsed as Record<string, unknown>;
+    const keys = Object.keys(obj);
+    const lines = [
+      `json:o keys=${keys.length}`,
+      `k:${keys.slice(0, 15).join(',')}`,
+    ];
+    return clampToMaxChars(lines.join('\n'), maxChars);
+  }
+
+  return clampToMaxChars(`json:v ${JSON.stringify(parsed) ?? 'null'}`, maxChars);
+}
+
+function ultraLog(text: string, maxChars: number): string {
+  const lines = text.split('\n');
+  let errCount = 0;
+  let warnCount = 0;
+  const errSamples: string[] = [];
+  const warnSamples: string[] = [];
+
+  for (const line of lines) {
+    if (/\b(error|exception|fatal|panic|critical)\b/i.test(line)) {
+      errCount++;
+      if (errSamples.length < 3) errSamples.push(line.slice(0, 120));
+      continue;
+    }
+    if (/\b(warn|warning)\b/i.test(line)) {
+      warnCount++;
+      if (warnSamples.length < 2) warnSamples.push(line.slice(0, 100));
+    }
+  }
+
+  const out = [
+    `log lines=${lines.length} err=${errCount} warn=${warnCount}`,
+    ...errSamples.map(line => `e:${line}`),
+    ...warnSamples.map(line => `w:${line}`),
+  ].join('\n');
+  return clampToMaxChars(out, maxChars);
+}
+
+function ultraMarkdown(text: string, maxChars: number): string {
+  const lines = text.split('\n');
+  const headings: string[] = [];
+  const withLead = maxChars > 900;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    if (!/^#{1,6}\s/.test(line)) continue;
+    headings.push(line.trim());
+    if (withLead) {
+      let j = i + 1;
+      while (j < lines.length && !(lines[j] ?? '').trim()) j++;
+      if (j < lines.length) headings.push((lines[j] ?? '').trim().slice(0, 90));
+    }
+    if (headings.length >= 60) break;
+  }
+
+  const out = headings.join('\n');
+  if (out.trim()) return clampToMaxChars(out, maxChars);
+  return ultraGeneric(text, maxChars);
+}
+
+function ultraCsv(text: string, maxChars: number): string {
+  const lines = text.split('\n').filter(l => l.trim());
+  if (lines.length === 0) return '';
+
+  const delimiters = [',', '\t', ';', '|'];
+  let delimiter = ',';
+  for (const d of delimiters) {
+    if ((lines[0] ?? '').includes(d)) {
+      delimiter = d;
+      break;
+    }
+  }
+
+  const header = lines[0] ?? '';
+  const cols = header.split(delimiter).map(c => c.trim()).filter(Boolean);
+  const rowCount = Math.max(0, lines.length - 1);
+  const sample = lines[1] ?? '';
+
+  const out = [
+    `csv rows=${rowCount} cols=${cols.length}`,
+    `c:${cols.slice(0, 12).join(',')}`,
+    sample ? `s:${sample.slice(0, 140)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  return clampToMaxChars(out, maxChars);
+}
+
+function ultraCode(text: string, maxChars: number): string {
+  const lines = text.split('\n');
+  const picks: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (
+      /^(export\s+)?(async\s+)?function\s+\w+/.test(trimmed) ||
+      /^(export\s+)?(abstract\s+)?class\s+\w+/.test(trimmed) ||
+      /^(type|interface|enum)\s+\w+/.test(trimmed) ||
+      /^(import|from)\s/.test(trimmed)
+    ) {
+      picks.push(trimmed.slice(0, 120));
+    }
+    if (picks.length >= 40) break;
+  }
+
+  const out = picks.join('\n');
+  if (out.trim()) return clampToMaxChars(out, maxChars);
+  return ultraGeneric(text, maxChars);
+}
+
+function ultraGeneric(text: string, maxChars: number): string {
+  const lines = text.split('\n');
+  if (lines.length <= 16) return clampToMaxChars(text, maxChars);
+
+  const head = lines.slice(0, 10).join('\n');
+  const tail = lines.slice(-4).join('\n');
+  const omitted = lines.length - 14;
+  const out = `${head}\n...\n[omit:${omitted}]\n...\n${tail}`;
+  return clampToMaxChars(out, maxChars);
 }
 
 function genericTruncate(
@@ -513,23 +711,30 @@ function genericTruncate(
 export function compress(text: string, options: CompressOptions = {}): CompressResult {
   const maxOutputChars = resolveMaxOutputChars(options.maxOutputChars);
   const inputChars = text.length;
-
-  const contentType = detectContentType(text);
-  let strategy: CompressionStrategy = options.strategy ?? 'auto';
+  const parsedJson = options.parsedJson ?? tryParseJson(text);
+  const contentType = detectContentTypeWithParsed(text, parsedJson);
+  let strategy: CompressionStrategy = options.strategy ?? DEFAULT_CONFIG.compression.defaultStrategy;
   let output: string;
+
+  if (!options.strategy && options.intent) {
+    strategy = 'filter';
+  }
 
   if (strategy === 'auto') {
     // Pick best strategy based on content type
     if (options.intent) {
       strategy = 'filter';
     } else {
-      strategy = 'summarize';
+      strategy = 'ultra';
     }
   }
 
   switch (strategy) {
     case 'filter':
       output = filterByIntent(text, options.intent ?? '', maxOutputChars);
+      break;
+    case 'ultra':
+      output = compressUltra(text, contentType, maxOutputChars, parsedJson);
       break;
     case 'truncate':
       output = genericTruncate(
@@ -543,7 +748,7 @@ export function compress(text: string, options: CompressOptions = {}): CompressR
     case 'summarize':
       switch (contentType) {
         case 'json':
-          output = compressJson(text, maxOutputChars, options.intent);
+          output = compressJson(text, maxOutputChars, options.intent, parsedJson);
           break;
         case 'log':
           output = compressLog(text, maxOutputChars, options.intent);

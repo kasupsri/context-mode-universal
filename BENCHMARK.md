@@ -9,12 +9,12 @@ Benchmarks run with `max_output_tokens: 2000` (8KB target output).
 
 | Content Type | Detected As | Input | Output | Savings | Strategy |
 |---|---|---|---|---|---|
-| git log (500 commits) | generic | 19.3KB | 2.7KB | **86%** | summarize |
-| JSON API (500 users) | json | 72.9KB | 0.4KB | **99%** | summarize |
-| Application logs (1000 lines) | log | 47.8KB | 1KB | **98%** | summarize |
-| Markdown docs (15 sections) | markdown | 41.8KB | 7.8KB | **81%** | summarize |
-| CSV export (500 rows) | csv | 12.9KB | 0.3KB | **97%** | summarize |
-| npm list (300 packages) | generic | 6.4KB | 1.5KB | **77%** | summarize |
+| git log (500 commits) | generic | 19.3KB | 0.5KB | **97%** | ultra |
+| JSON API (500 users) | json | 72.9KB | 0.3KB | **100%** | ultra |
+| Application logs (1000 lines) | log | 47.8KB | 0.3KB | **99%** | ultra |
+| Markdown docs (15 sections) | markdown | 41.8KB | 2KB | **95%** | ultra |
+| CSV export (500 rows) | csv | 12.9KB | 0.1KB | **100%** | ultra |
+| npm list (300 packages) | generic | 6.4KB | 0.3KB | **95%** | ultra |
 
 ## Methodology
 

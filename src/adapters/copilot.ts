@@ -12,52 +12,13 @@ const MCP_CONFIG = (pkg: string) => ({
   },
 });
 
-const COPILOT_INSTRUCTIONS = `# Context-Mode Instructions for GitHub Copilot
+const COPILOT_INSTRUCTIONS = `# Context-Mode Instructions
 
-## Response Optimization
-
-Route tool outputs through context-mode MCP tools to preserve context and minimize tokens:
-
-### For shell commands
-Use \`context-mode.execute\` with an intent parameter:
-\`\`\`
-context-mode.execute({
-  language: "shell",
-  code: "git log --oneline -50",
-  intent: "find commits related to the bug fix",
-  max_output_tokens: 800
-})
-\`\`\`
-
-### For files
-Use \`context-mode.execute_file\`:
-\`\`\`
-context-mode.execute_file({
-  file_path: "/absolute/path/to/file.json",
-  code: "const d = JSON.parse(process.env.FILE_CONTENT); console.log(Object.keys(d).join(', '))",
-  max_output_tokens: 600
-})
-\`\`\`
-
-### For documentation
-Fetch and index, then search:
-\`\`\`
-context-mode.fetch_and_index({ url: "https://docs.example.com" })
-context-mode.search({ query: "relevant topic" })
-\`\`\`
-
-### For any large text
-\`\`\`
-context-mode.compress({ content: largeText, intent: "find error messages", max_output_tokens: 600 })
-\`\`\`
-
-## Commands with high optimization impact
-- git log, git diff, git show
-- npm list, yarn why, pip list, cargo tree
-- cat on files > 200 lines
-- find with many results
-- Test suite output
-- API responses
+Use context-mode for all tool interactions that can produce long output.
+- Prefer \`response_mode: "minimal"\`
+- Prefer \`max_output_tokens: 400\`
+- Use \`search({ compact: true })\` for retrieval
+- Use \`response_mode: "full"\` only when explicitly needed
 `;
 
 export class CopilotAdapter implements BaseAdapter {

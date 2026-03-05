@@ -1,5 +1,6 @@
 import { type CompressionStrategy } from '../compression/strategies.js';
 import { DEFAULT_CONFIG } from '../config/defaults.js';
+import { type ResponseMode } from '../config/defaults.js';
 import { executeCode } from '../sandbox/executor.js';
 import { type Language, type ShellRuntime } from '../sandbox/runtimes.js';
 import {
@@ -16,9 +17,11 @@ export interface ProxyToolInput {
   intent?: string;
   strategy?: CompressionStrategy;
   max_output_tokens?: number;
+  response_mode?: ResponseMode;
 }
 
 export async function proxyTool(input: ProxyToolInput): Promise<string> {
+  const responseMode = input.response_mode ?? DEFAULT_CONFIG.compression.responseMode;
   let rawOutput: string;
 
   switch (input.tool) {
@@ -66,15 +69,24 @@ export async function proxyTool(input: ProxyToolInput): Promise<string> {
         timeoutMs: timeout,
         allowAuthPassthrough: DEFAULT_CONFIG.sandbox.allowAuthPassthrough,
       });
-      rawOutput = result.stdout;
-      if (result.stderr) {
-        rawOutput += `${rawOutput ? '\n' : ''}STDERR:\n${result.stderr}`;
-      }
-      if (result.timedOut) {
-        rawOutput = `[TIMEOUT after ${timeout}ms]\n${rawOutput}`;
-      }
-      if (result.exitCode !== 0 && !result.timedOut) {
-        rawOutput += `\n[Exit code: ${result.exitCode}]`;
+      if (responseMode === 'full') {
+        rawOutput = result.stdout;
+        if (result.stderr) {
+          rawOutput += `${rawOutput ? '\n' : ''}STDERR:\n${result.stderr}`;
+        }
+        if (result.timedOut) {
+          rawOutput = `[TIMEOUT after ${timeout}ms]\n${rawOutput}`;
+        }
+        if (result.exitCode !== 0 && !result.timedOut) {
+          rawOutput += `\n[Exit code: ${result.exitCode}]`;
+        }
+      } else {
+        const parts: string[] = [];
+        if (result.timedOut) parts.push(`timeout:${timeout}ms`);
+        if (result.stderr.trim()) parts.push(`err:${result.stderr.trim()}`);
+        if (result.stdout.trim()) parts.push(result.stdout.trimEnd());
+        if (result.exitCode !== 0 && !result.timedOut) parts.push(`code:${result.exitCode}`);
+        rawOutput = parts.join('\n') || 'ok';
       }
       break;
     }
@@ -116,23 +128,26 @@ export async function proxyTool(input: ProxyToolInput): Promise<string> {
     }
 
     default: {
-      return [
-        `The proxy tool cannot directly invoke "${input.tool}" ` +
-          '(MCP servers cannot call other MCP tools).',
-        '',
-        'Instead, capture the output yourself and pipe it through the compress tool:',
-        '',
-        '```',
-        'compress({',
-        `  content: <output from ${input.tool}>,`,
-        input.intent ? `  intent: "${input.intent}",` : '',
-        '})',
-        '```',
-        '',
-        'Or use execute() with shell to run CLI commands and get compressed output.',
-      ]
-        .filter(Boolean)
-        .join('\n');
+      if (responseMode === 'full') {
+        return [
+          `The proxy tool cannot directly invoke "${input.tool}" ` +
+            '(MCP servers cannot call other MCP tools).',
+          '',
+          'Instead, capture the output yourself and pipe it through the compress tool:',
+          '',
+          '```',
+          'compress({',
+          `  content: <output from ${input.tool}>,`,
+          input.intent ? `  intent: "${input.intent}",` : '',
+          '})',
+          '```',
+          '',
+          'Or use execute() with shell to run CLI commands and get compressed output.',
+        ]
+          .filter(Boolean)
+          .join('\n');
+      }
+      return `err:proxy_unsupported tool=${input.tool}`;
     }
   }
 

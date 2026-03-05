@@ -275,7 +275,7 @@ export class SqliteStore {
     return scored.sort((a, b) => b.score - a.score);
   }
 
-  private extractSnippet(content: string, query: string, maxLen = 240): string {
+  private extractSnippet(content: string, query: string, maxLen = 160): string {
     const queryWords = query.toLowerCase().split(/\s+/);
     const contentLower = content.toLowerCase();
 

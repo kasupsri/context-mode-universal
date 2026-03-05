@@ -103,11 +103,11 @@ describe('Index → Search integration', () => {
     expect(response.results[0]!.source).toBe('angular-docs.md');
   });
 
-  it('formats search results as readable markdown', async () => {
+  it('formats search results in compact mode by default', async () => {
     const response = await searcher.search('component architecture', { kbName });
     const formatted = searcher.formatResults(response);
 
-    expect(formatted).toContain('Result');
+    expect(formatted).toContain('search n=');
     expect(formatted).toContain('angular-docs.md');
   });
 

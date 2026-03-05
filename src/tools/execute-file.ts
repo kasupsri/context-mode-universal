@@ -1,5 +1,6 @@
 import { executeFile } from '../sandbox/executor.js';
 import { DEFAULT_CONFIG } from '../config/defaults.js';
+import { type ResponseMode } from '../config/defaults.js';
 import {
   denyReason,
   evaluateCommand,
@@ -13,6 +14,7 @@ export interface ExecuteFileToolInput {
   intent?: string;
   timeout?: number;
   max_output_tokens?: number;
+  response_mode?: ResponseMode;
 }
 
 export async function executeFileTool(input: ExecuteFileToolInput): Promise<string> {
@@ -38,19 +40,26 @@ export async function executeFileTool(input: ExecuteFileToolInput): Promise<stri
     timeoutMs,
     maxFileBytes: DEFAULT_CONFIG.sandbox.maxFileBytes,
   });
+  const responseMode = input.response_mode ?? DEFAULT_CONFIG.compression.responseMode;
 
-  let rawOutput = result.stdout;
-
-  if (result.stderr) {
-    rawOutput += `${rawOutput ? '\n' : ''}STDERR:\n${result.stderr}`;
+  if (responseMode === 'full') {
+    let rawOutput = result.stdout;
+    if (result.stderr) {
+      rawOutput += `${rawOutput ? '\n' : ''}STDERR:\n${result.stderr}`;
+    }
+    if (result.exitCode !== 0 && !result.timedOut) {
+      rawOutput += `\n[Exit code: ${result.exitCode}]`;
+    }
+    if (result.timedOut) {
+      rawOutput = `[TIMEOUT after ${timeoutMs}ms]\n${rawOutput}`;
+    }
+    return rawOutput;
   }
 
-  if (result.exitCode !== 0 && !result.timedOut) {
-    rawOutput += `\n[Exit code: ${result.exitCode}]`;
-  }
-
-  if (result.timedOut) {
-    rawOutput = `[TIMEOUT after ${timeoutMs}ms]\n${rawOutput}`;
-  }
-  return rawOutput;
+  const parts: string[] = [];
+  if (result.timedOut) parts.push(`timeout:${timeoutMs}ms`);
+  if (result.stderr.trim()) parts.push(`err:${result.stderr.trim()}`);
+  if (result.stdout.trim()) parts.push(result.stdout.trimEnd());
+  if (result.exitCode !== 0 && !result.timedOut) parts.push(`code:${result.exitCode}`);
+  return parts.join('\n') || 'ok';
 }

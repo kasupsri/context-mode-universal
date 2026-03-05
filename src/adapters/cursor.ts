@@ -17,43 +17,16 @@ const MCP_CONFIG = (pkg: string) =>
   );
 
 const CURSOR_RULES = `---
-description: Route all tool outputs through context-mode-universal for minimum-token responses
+description: Always use context-mode-universal for token-efficient tool output
 globs: ["**/*"]
 alwaysApply: true
 ---
 
-## Context Preservation Rules
-
-Use \`context-mode-universal\` MCP tools for substantial tool interactions:
-
-- Prefer \`execute({ language: "shell" })\` for PowerShell-first safe execution
-- Use \`execute_file\` for large local files
-- Use \`fetch_and_index\` + \`search\` for docs
-- Use \`compress\` for arbitrary large text
-- Use \`max_output_tokens\` on any tool call to enforce strict response budgets
-- Use \`stats_get\` to monitor optimization impact
-
-### Commands with high optimization impact
-- \`git log\`, \`git diff\`, \`cat\` large files, \`find\`, reading log files
-- \`npm list\`, \`pip list\`, dependency audits, \`yarn why\`
-- API responses, test suite output (>100 tests)
-- Browser snapshots, web page content, database dumps
-
-### Example usage
-
-\`\`\`
-// Instead of: bash("git log --oneline -50")
-execute({ language: "shell", code: "git log --oneline -50", intent: "recent changes", max_output_tokens: 800 })
-
-// Instead of: read_file("package-lock.json")
-execute_file({ file_path: "package-lock.json", code: "const d=JSON.parse(process.env.FILE_CONTENT); console.log('Packages:', Object.keys(d.dependencies||{}).length)" })
-
-// Compress any large text
-compress({ content: largeOutput, intent: "find error messages", max_output_tokens: 600 })
-
-// View token/context savings
-stats_get({})
-\`\`\`
+Use only context-mode-universal tools for shell, large files, docs, and long output.
+Default to short responses:
+- response_mode: "minimal"
+- max_output_tokens: 400
+- use search(compact:true) after fetch_and_index/index
 `;
 
 export class CursorAdapter implements BaseAdapter {
